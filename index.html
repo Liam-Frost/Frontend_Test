@@ -14,9 +14,12 @@
           <span class="sr-only">Parallax</span>
         </a>
         <ul class="nav-links">
-          <li><a href="#">My Account</a></li>
-          <li><a href="#">My Vehicles</a></li>
-          <li><a href="#">Query</a></li>
+          <li><a href="#" id="nav-account">My Account</a></li>
+          <li><a href="#" id="nav-vehicles">My Vehicles</a></li>
+          <li><a href="#" id="nav-query">Query</a></li>
+          <li id="nav-signout-item" class="hidden">
+            <a href="#" id="nav-signout">Sign out</a>
+          </li>
         </ul>
       </nav>
     </header>
@@ -312,7 +315,7 @@
 
       <section id="license-section" class="license-panel hidden" aria-live="polite">
         <div class="license-header">
-          <h2>License Registration</h2>
+          <h2>Vehicles Management</h2>
           <p id="welcome-message"></p>
         </div>
         <form id="license-form" class="license-form">
@@ -322,23 +325,205 @@
               type="text"
               id="license-number"
               placeholder="e.g., ABC1234"
-              pattern="^[A-Z0-9-]{5,10}$"
+              pattern="^[A-Z0-9-]{1,7}$"
               title="Enter a license plate like ABC1234"
               required
             />
           </label>
           <label class="license-field">
+            <span>Vehicle manufacturer</span>
+            <select id="vehicle-make" required>
+              <option value="" disabled selected>Select manufacturer</option>
+            </select>
+          </label>
+          <label class="license-field">
             <span>Vehicle model</span>
-            <input type="text" id="vehicle-model" placeholder="Vehicle model" required />
+            <select id="vehicle-model" required>
+              <option value="" disabled selected>Select model</option>
+            </select>
+          </label>
+          <label class="license-field">
+            <span>Vehicle year</span>
+            <select id="vehicle-year" required>
+              <option value="" disabled selected>Select year</option>
+            </select>
           </label>
           <button type="submit" class="primary-button">Save license</button>
         </form>
         <p id="license-message" class="message" role="alert"></p>
         <div class="license-list-container">
-          <h3>Registered license plates</h3>
-          <ul id="license-list" class="license-list"></ul>
+          <h3>Registered vehicles</h3>
+          <div class="table-wrapper">
+            <table id="vehicles-table" class="vehicles-table">
+              <thead>
+                <tr>
+                  <th scope="col">License Plate</th>
+                  <th scope="col">Manufacturer</th>
+                  <th scope="col">Model</th>
+                  <th scope="col">Year</th>
+                  <th scope="col">Blacklist Status</th>
+                  <th scope="col">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="vehicles-table-body"></tbody>
+            </table>
+          </div>
         </div>
-        <button id="logout-button" class="secondary-button">Sign out</button>
+      </section>
+
+      <section id="query-section" class="query-panel hidden" aria-live="polite">
+        <div class="query-header">
+          <h2>Vehicles Query</h2>
+          <p>Enter a license plate to check its blacklist status.</p>
+        </div>
+
+        <form id="query-form" class="query-form" novalidate>
+          <label class="license-field" for="query-license-input">
+            <span>License plate number</span>
+            <input
+              type="text"
+              id="query-license-input"
+              placeholder="e.g., ABC123"
+              pattern="^[A-Z0-9-]{1,7}$"
+              required
+            />
+          </label>
+          <button type="submit" class="primary-button">Search</button>
+        </form>
+
+        <p id="query-message" class="message" role="status"></p>
+      </section>
+
+      <section
+        id="account-section"
+        class="account-panel hidden"
+        aria-live="polite"
+      >
+        <div class="account-header-block">
+          <h2>Account Management</h2>
+          <p>Update your contact info, secure your account, or remove it entirely.</p>
+        </div>
+
+        <div class="account-block">
+          <h3>Account Details</h3>
+          <p class="account-block-description">
+            Change your email or phone number. Enter your current password to save
+            changes.
+          </p>
+          <form id="account-contact-form" class="account-form" novalidate>
+            <label class="field-block" for="account-email">
+              <span class="field-label">Email</span>
+              <input id="account-email" type="email" autocomplete="email" required />
+            </label>
+
+            <div class="field-row">
+              <label class="field-block" for="account-phone-country">
+                <span class="field-label">Country code</span>
+                <select id="account-phone-country" required>
+                  <option value="" disabled selected>Select</option>
+                  <option value="+86">+86 (China)</option>
+                  <option value="+1">+1 (USA/Canada)</option>
+                  <option value="+44">+44 (UK)</option>
+                  <option value="+61">+61 (Australia)</option>
+                  <option value="+81">+81 (Japan)</option>
+                </select>
+              </label>
+              <label class="field-block" for="account-phone">
+                <span class="field-label">Phone number</span>
+                <input id="account-phone" type="tel" autocomplete="tel" required />
+              </label>
+            </div>
+
+            <label class="field-block" for="account-current-password-for-contact">
+              <span class="field-label">Current password</span>
+              <input
+                id="account-current-password-for-contact"
+                type="password"
+                autocomplete="current-password"
+                required
+              />
+            </label>
+
+            <button type="submit" id="account-contact-save" class="primary-button">
+              Save changes
+            </button>
+            <p id="account-contact-message" class="message" role="alert"></p>
+          </form>
+        </div>
+
+        <div class="account-block">
+          <h3>Reset Password</h3>
+          <p class="account-block-description">
+            Change your password with verification for extra security.
+          </p>
+          <form id="account-password-form" class="account-form" novalidate>
+            <label class="field-block" for="account-old-password">
+              <span class="field-label">Current password</span>
+              <input
+                id="account-old-password"
+                type="password"
+                autocomplete="current-password"
+                required
+              />
+            </label>
+            <label class="field-block" for="account-new-password">
+              <span class="field-label">New password</span>
+              <input
+                id="account-new-password"
+                type="password"
+                autocomplete="new-password"
+                required
+              />
+            </label>
+            <label class="field-block" for="account-confirm-password">
+              <span class="field-label">Confirm new password</span>
+              <input
+                id="account-confirm-password"
+                type="password"
+                autocomplete="new-password"
+                required
+              />
+            </label>
+
+            <div class="verification-box">
+              <p class="verification-title">Type the characters in the image</p>
+              <div
+                class="verification-code"
+                id="account-captcha-display"
+                aria-live="polite"
+              >
+                1234
+              </div>
+              <div class="verification-actions">
+                <button type="button" class="link-button" id="account-refresh-captcha">
+                  New code
+                </button>
+              </div>
+              <input
+                id="account-captcha-input"
+                type="text"
+                aria-label="Verification code"
+                required
+              />
+            </div>
+
+            <button type="submit" id="account-password-save" class="primary-button">
+              Change password
+            </button>
+            <p id="account-password-message" class="message" role="alert"></p>
+          </form>
+        </div>
+
+        <div class="account-block danger">
+          <h3>Delete Account</h3>
+          <p class="account-block-description">
+            Deleting your account will remove all your vehicles and account data
+            from this browser. This action cannot be undone.
+          </p>
+          <button type="button" id="account-delete" class="danger-button">
+            Delete Account
+          </button>
+        </div>
       </section>
     </main>
 
