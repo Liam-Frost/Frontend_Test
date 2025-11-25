@@ -70,6 +70,12 @@ const querySection = document.getElementById("query-section");
 const queryForm = document.getElementById("query-form");
 const queryLicenseInput = document.getElementById("query-license-number");
 const queryMessage = document.getElementById("query-message");
+const navAccountLink = document.getElementById("nav-account");
+const navQueryLink = document.getElementById("nav-query");
+const querySection = document.getElementById("query-section");
+const queryForm = document.getElementById("query-form");
+const queryLicenseInput = document.getElementById("query-license-number");
+const queryMessage = document.getElementById("query-message");
 
 let currentUser = null;
 let loginStage = "identifier";
@@ -778,7 +784,6 @@ function enterAccountMode() {
 
 function enterQueryMode() {
   if (!currentUser) {
-    // if not signed in, go back to auth shell
     setNavSignoutVisibility(false);
     licenseSection?.classList.add("hidden");
     accountSection?.classList.add("hidden");
@@ -853,6 +858,60 @@ function handleLicenseSubmit(event) {
   licenseForm.reset();
   populateVehicleSelects();
   refreshLicenseList();
+}
+
+function handleQuerySubmit(event) {
+  event.preventDefault();
+
+  if (!currentUser) {
+    showLoginView();
+    return;
+  }
+
+  const raw = (queryLicenseInput?.value || "").trim().toUpperCase();
+  if (!LICENSE_PATTERN.test(raw)) {
+    showMessage(
+      queryMessage,
+      "Enter a valid license plate (1–7 chars, A–Z, 0–9, or hyphen).",
+      "error"
+    );
+    return;
+  }
+
+  const licenses = readLicenses();
+  let found = false;
+  let blacklisted = false;
+
+  Object.values(licenses).forEach((userLicenses) => {
+    (userLicenses || []).forEach((entry) => {
+      if (entry.licenseNumber === raw) {
+        found = true;
+        if (entry.blacklisted) {
+          blacklisted = true;
+        }
+      }
+    });
+  });
+
+  if (!found) {
+    showMessage(
+      queryMessage,
+      `License ${raw} was not found in the system.`,
+      "success"
+    );
+  } else if (blacklisted) {
+    showMessage(
+      queryMessage,
+      `License ${raw} is currently blacklisted.`,
+      "success"
+    );
+  } else {
+    showMessage(
+      queryMessage,
+      `License ${raw} is not blacklisted.`,
+      "success"
+    );
+  }
 }
 
 function handleQuerySubmit(event) {
@@ -1173,10 +1232,42 @@ registerForm.addEventListener("submit", handleRegister);
 loginForm.addEventListener("submit", handleLogin);
 resetForm?.addEventListener("submit", handleReset);
 licenseForm.addEventListener("submit", handleLicenseSubmit);
+
+// My Vehicles
 navVehiclesLink?.addEventListener("click", (event) => {
   event.preventDefault();
   handleNavVehicles(event);
 });
+
+// My Account
+navAccountLink?.addEventListener("click", (event) => {
+  event.preventDefault();
+  enterAccountMode();
+});
+
+// Query
+navQueryLink?.addEventListener("click", (event) => {
+  event.preventDefault();
+  enterQueryMode();
+});
+
+// Sign out
+navSignoutLink?.addEventListener("click", (event) => {
+  event.preventDefault();
+  exitLicenseMode();
+});
+
+// Account forms
+accountContactForm?.addEventListener("submit", handleAccountContactSubmit);
+accountPasswordForm?.addEventListener("submit", handleAccountPasswordSubmit);
+accountDeleteButton?.addEventListener("click", (event) => {
+  event.preventDefault();
+  handleAccountDelete();
+});
+
+// Query form
+queryForm?.addEventListener("submit", handleQuerySubmit);
+
 navAccountLink?.addEventListener("click", (event) => {
   event.preventDefault();
   enterAccountMode();
