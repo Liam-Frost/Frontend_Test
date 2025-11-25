@@ -22,11 +22,18 @@ const resetBackLink = document.getElementById("reset-back-link");
 const signinCard = document.querySelector(".signin-card");
 const authShell = document.getElementById("auth-shell");
 const licenseSection = document.getElementById("license-section");
+const accountSection = document.getElementById("account-section");
 const licenseForm = document.getElementById("license-form");
 const licenseMessage = document.getElementById("license-message");
 const welcomeMessage = document.getElementById("welcome-message");
-const licenseList = document.getElementById("license-list");
-const logoutButton = document.getElementById("logout-button");
+const vehicleMakeSelect = document.getElementById("vehicle-make");
+const vehicleModelSelect = document.getElementById("vehicle-model");
+const vehicleYearSelect = document.getElementById("vehicle-year");
+const vehiclesTableBody = document.getElementById("vehicles-table-body");
+const navAccountLink = document.getElementById("nav-account");
+const navVehiclesLink = document.getElementById("nav-vehicles");
+const navSignoutItem = document.getElementById("nav-signout-item");
+const navSignoutLink = document.getElementById("nav-signout");
 const monthSelect = document.getElementById("register-birth-month");
 const daySelect = document.getElementById("register-birth-day");
 const yearSelect = document.getElementById("register-birth-year");
@@ -37,12 +44,46 @@ const resetIdentifierInput = document.getElementById("reset-identifier");
 const resetCaptchaInput = document.getElementById("reset-captcha-input");
 const resetCaptchaDisplay = document.getElementById("reset-captcha-display");
 const resetRefreshCaptchaButton = document.getElementById("reset-refresh-captcha");
+const accountEmailInput = document.getElementById("account-email");
+const accountPhoneCountrySelect = document.getElementById("account-phone-country");
+const accountPhoneInput = document.getElementById("account-phone");
+const accountCurrentPasswordInput = document.getElementById(
+  "account-current-password-for-contact"
+);
+const accountContactForm = document.getElementById("account-contact-form");
+const accountContactMessage = document.getElementById("account-contact-message");
+const accountOldPasswordInput = document.getElementById("account-old-password");
+const accountNewPasswordInput = document.getElementById("account-new-password");
+const accountConfirmPasswordInput = document.getElementById(
+  "account-confirm-password"
+);
+const accountPasswordForm = document.getElementById("account-password-form");
+const accountPasswordMessage = document.getElementById("account-password-message");
+const accountCaptchaDisplay = document.getElementById("account-captcha-display");
+const accountCaptchaInput = document.getElementById("account-captcha-input");
+const accountRefreshCaptchaButton = document.getElementById(
+  "account-refresh-captcha"
+);
+const accountDeleteButton = document.getElementById("account-delete");
 
 let currentUser = null;
 let loginStage = "identifier";
 const captchaState = {
   register: "469P",
   reset: "469P",
+  account: "1234",
+};
+
+const LICENSE_PATTERN = /^[A-Z0-9-]{1,7}$/;
+const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const PASSWORD_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d]{8,}$/;
+const VEHICLE_MODELS = {
+  Toyota: ["Camry", "Corolla", "RAV4", "Prius"],
+  Honda: ["Civic", "Accord", "CR-V", "Pilot"],
+  Ford: ["F-150", "Escape", "Mustang", "Explorer"],
+  Tesla: ["Model S", "Model 3", "Model X", "Model Y"],
+  BMW: ["3 Series", "5 Series", "X3", "X5"],
+  Mercedes: ["C-Class", "E-Class", "GLC", "GLE"],
 };
 
 function readUsers() {
@@ -188,6 +229,66 @@ function populateBirthSelects() {
   yearSelect.addEventListener("change", () => updateBirthDayOptions());
 }
 
+function populateVehicleSelects() {
+  if (!vehicleMakeSelect || !vehicleModelSelect || !vehicleYearSelect) return;
+
+  vehicleMakeSelect.innerHTML = "";
+  const makePlaceholder = document.createElement("option");
+  makePlaceholder.value = "";
+  makePlaceholder.textContent = "Select manufacturer";
+  makePlaceholder.disabled = true;
+  makePlaceholder.selected = true;
+  vehicleMakeSelect.appendChild(makePlaceholder);
+
+  Object.keys(VEHICLE_MODELS).forEach((make) => {
+    const option = document.createElement("option");
+    option.value = make;
+    option.textContent = make;
+    vehicleMakeSelect.appendChild(option);
+  });
+
+  const currentYear = new Date().getFullYear();
+  const startYear = 1980;
+  vehicleYearSelect.innerHTML = "";
+  const yearPlaceholder = document.createElement("option");
+  yearPlaceholder.value = "";
+  yearPlaceholder.textContent = "Select year";
+  yearPlaceholder.disabled = true;
+  yearPlaceholder.selected = true;
+  vehicleYearSelect.appendChild(yearPlaceholder);
+
+  for (let year = currentYear; year >= startYear; year -= 1) {
+    const option = document.createElement("option");
+    option.value = String(year);
+    option.textContent = String(year);
+    vehicleYearSelect.appendChild(option);
+  }
+
+  const resetModelOptions = (selectedMake) => {
+    vehicleModelSelect.innerHTML = "";
+    const modelPlaceholder = document.createElement("option");
+    modelPlaceholder.value = "";
+    modelPlaceholder.textContent = "Select model";
+    modelPlaceholder.disabled = true;
+    modelPlaceholder.selected = true;
+    vehicleModelSelect.appendChild(modelPlaceholder);
+
+    const models = VEHICLE_MODELS[selectedMake] || [];
+    models.forEach((model) => {
+      const option = document.createElement("option");
+      option.value = model;
+      option.textContent = model;
+      vehicleModelSelect.appendChild(option);
+    });
+  };
+
+  resetModelOptions("");
+
+  vehicleMakeSelect.addEventListener("change", (event) => {
+    resetModelOptions(event.target.value);
+  });
+}
+
 function resetRegisterForm() {
   if (registerForm) {
     registerForm.reset();
@@ -213,6 +314,11 @@ function updateCaptchaDisplay(context, code) {
 
   if (context === "reset" && resetCaptchaDisplay) {
     resetCaptchaDisplay.textContent = code;
+    return;
+  }
+
+  if (context === "account" && accountCaptchaDisplay) {
+    accountCaptchaDisplay.textContent = code;
   }
 }
 
@@ -224,6 +330,11 @@ function clearCaptchaInput(context) {
 
   if (context === "reset" && resetCaptchaInput) {
     resetCaptchaInput.value = "";
+    return;
+  }
+
+  if (context === "account" && accountCaptchaInput) {
+    accountCaptchaInput.value = "";
   }
 }
 
@@ -239,10 +350,17 @@ function generateCaptcha(context = "register") {
   clearCaptchaInput(context);
 }
 
+function setNavSignoutVisibility(isVisible) {
+  if (navSignoutItem) {
+    navSignoutItem.classList.toggle("hidden", !isVisible);
+  }
+}
+
 function setupCaptchaControls() {
   const controls = [
     { refresh: refreshCaptchaButton, context: "register" },
     { refresh: resetRefreshCaptchaButton, context: "reset" },
+    { refresh: accountRefreshCaptchaButton, context: "account" },
   ];
 
   controls.forEach(({ refresh, context }) => {
@@ -369,8 +487,7 @@ function handleRegister(event) {
     return;
   }
 
-  const emailPattern = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-  if (!emailPattern.test(email || "")) {
+  if (!EMAIL_PATTERN.test(email || "")) {
     showMessage(authMessage, "Enter a valid email address.", "error");
     return;
   }
@@ -443,8 +560,15 @@ function handleRegister(event) {
   users.push(newUser);
   saveUsers(users);
   resetRegisterForm();
-  showLoginView();
-  showMessage(authMessage, "Registration successful! Please sign in to continue.", "success");
+  currentUser = newUser;
+  setSession(newUser);
+  showMessage(authMessage, "Registration successful!", "success");
+  enterLicenseMode();
+  showMessage(
+    licenseMessage,
+    "Registration successful! You can start adding vehicles now.",
+    "success"
+  );
 }
 
 function handleReset(event) {
@@ -572,6 +696,10 @@ function enterLicenseMode() {
   if (!currentUser) return;
   authShell.classList.add("hidden");
   licenseSection.classList.remove("hidden");
+  accountSection?.classList.add("hidden");
+  setNavSignoutVisibility(true);
+  licenseForm?.reset();
+  populateVehicleSelects();
   const name =
     currentUser.displayName ||
     [currentUser.firstName, currentUser.lastName].filter(Boolean).join(" ") ||
@@ -585,9 +713,59 @@ function exitLicenseMode() {
   currentUser = null;
   setSession(null);
   licenseSection.classList.add("hidden");
+  accountSection?.classList.add("hidden");
   authShell.classList.remove("hidden");
+  setNavSignoutVisibility(false);
   showLoginView();
   showMessage(authMessage, "You have signed out.", "success");
+}
+
+function populateAccountFields() {
+  if (!currentUser) return;
+  if (accountEmailInput) {
+    accountEmailInput.value = currentUser.email || "";
+  }
+  if (accountPhoneCountrySelect) {
+    accountPhoneCountrySelect.value = currentUser.phoneCountry || "";
+  }
+  if (accountPhoneInput) {
+    accountPhoneInput.value = currentUser.phone || "";
+  }
+  if (accountCurrentPasswordInput) {
+    accountCurrentPasswordInput.value = "";
+  }
+  if (accountOldPasswordInput) {
+    accountOldPasswordInput.value = "";
+  }
+  if (accountNewPasswordInput) {
+    accountNewPasswordInput.value = "";
+  }
+  if (accountConfirmPasswordInput) {
+    accountConfirmPasswordInput.value = "";
+  }
+  if (accountCaptchaInput) {
+    accountCaptchaInput.value = "";
+  }
+}
+
+function enterAccountMode() {
+  if (!currentUser) {
+    setNavSignoutVisibility(false);
+    licenseSection?.classList.add("hidden");
+    accountSection?.classList.add("hidden");
+    authShell?.classList.remove("hidden");
+    showLoginView();
+    return;
+  }
+
+  authShell?.classList.add("hidden");
+  licenseSection?.classList.add("hidden");
+  accountSection?.classList.remove("hidden");
+  setNavSignoutVisibility(true);
+  populateAccountFields();
+  generateCaptcha("account");
+  showMessage(accountContactMessage, "");
+  showMessage(accountPasswordMessage, "");
 }
 
 function handleLicenseSubmit(event) {
@@ -596,12 +774,26 @@ function handleLicenseSubmit(event) {
     .getElementById("license-number")
     .value.trim()
     .toUpperCase();
-  const vehicleModel = document
-    .getElementById("vehicle-model")
-    .value.trim();
+  const vehicleMake = vehicleMakeSelect?.value || "";
+  const vehicleModel = vehicleModelSelect?.value || "";
+  const vehicleYear = vehicleYearSelect?.value || "";
 
   if (!currentUser) {
     showMessage(licenseMessage, "Please sign in first.", "error");
+    return;
+  }
+
+  if (!LICENSE_PATTERN.test(licenseNumber)) {
+    showMessage(
+      licenseMessage,
+      "License plate must be 1-7 characters, A-Z, 0-9, or hyphen.",
+      "error"
+    );
+    return;
+  }
+
+  if (!vehicleMake || !vehicleModel || !vehicleYear) {
+    showMessage(licenseMessage, "Please select make, model, and year.", "error");
     return;
   }
 
@@ -615,7 +807,10 @@ function handleLicenseSubmit(event) {
 
   const entry = {
     licenseNumber,
-    vehicleModel,
+    make: vehicleMake,
+    model: vehicleModel,
+    year: vehicleYear,
+    blacklisted: false,
     createdAt: new Date().toISOString(),
   };
 
@@ -624,32 +819,207 @@ function handleLicenseSubmit(event) {
   saveLicenses(licenses);
   showMessage(licenseMessage, "License plate saved successfully!", "success");
   licenseForm.reset();
+  populateVehicleSelects();
   refreshLicenseList();
 }
 
+function handleAccountContactSubmit(event) {
+  event.preventDefault();
+  if (!currentUser) {
+    showLoginView();
+    return;
+  }
+
+  const email = accountEmailInput?.value.trim();
+  const lowerEmail = (email || "").toLowerCase();
+  const phoneCountry = accountPhoneCountrySelect?.value || "";
+  const phoneDigits = (accountPhoneInput?.value || "").replace(/\D/g, "");
+  const currentPassword = accountCurrentPasswordInput?.value || "";
+
+  if (currentPassword !== currentUser.password) {
+    showMessage(accountContactMessage, "Incorrect current password.", "error");
+    return;
+  }
+
+  if (!EMAIL_PATTERN.test(lowerEmail)) {
+    showMessage(accountContactMessage, "Enter a valid email address.", "error");
+    return;
+  }
+
+  const users = readUsers();
+  const emailTaken = users.some(
+    (user) => user.username !== currentUser.username && user.email?.toLowerCase() === lowerEmail
+  );
+
+  if (emailTaken) {
+    showMessage(accountContactMessage, "That email is already in use.", "error");
+    return;
+  }
+
+  if (!phoneCountry || phoneDigits.length < 5) {
+    showMessage(accountContactMessage, "Enter a valid phone number and country code.", "error");
+    return;
+  }
+
+  const phoneSignature = `${phoneCountry.replace(/\D/g, "")}${phoneDigits}`;
+  const phoneTaken = users.some((user) => {
+    if (user.username === currentUser.username) return false;
+    const storedDigits = String(user.phone || "").replace(/\D/g, "");
+    const storedCountry = String(user.phoneCountry || "").replace(/\D/g, "");
+    return storedDigits && storedCountry + storedDigits === phoneSignature;
+  });
+
+  if (phoneTaken) {
+    showMessage(accountContactMessage, "That phone number is already in use.", "error");
+    return;
+  }
+
+  const oldUsername = currentUser.username;
+  currentUser.email = lowerEmail;
+  currentUser.username = lowerEmail;
+  currentUser.phoneCountry = phoneCountry;
+  currentUser.phone = phoneDigits;
+
+  const updatedUsers = users.map((user) =>
+    user.username === oldUsername ? { ...user, ...currentUser } : user
+  );
+  saveUsers(updatedUsers);
+
+  const licenses = readLicenses();
+  if (lowerEmail !== oldUsername && licenses[oldUsername]) {
+    licenses[lowerEmail] = licenses[oldUsername];
+    delete licenses[oldUsername];
+    saveLicenses(licenses);
+  } else if (lowerEmail === oldUsername) {
+    saveLicenses(licenses);
+  }
+
+  setSession(currentUser);
+  populateAccountFields();
+  showMessage(accountContactMessage, "Contact information updated successfully.", "success");
+}
+
+function handleAccountPasswordSubmit(event) {
+  event.preventDefault();
+  if (!currentUser) {
+    showLoginView();
+    return;
+  }
+
+  const oldPassword = accountOldPasswordInput?.value || "";
+  const newPassword = accountNewPasswordInput?.value || "";
+  const confirmPassword = accountConfirmPasswordInput?.value || "";
+  const captchaValue = accountCaptchaInput?.value || "";
+
+  if (oldPassword !== currentUser.password) {
+    showMessage(accountPasswordMessage, "Incorrect current password.", "error");
+    return;
+  }
+
+  if (!PASSWORD_PATTERN.test(newPassword)) {
+    showMessage(
+      accountPasswordMessage,
+      "Password must be at least 8 characters with upper, lower, and a number.",
+      "error"
+    );
+    return;
+  }
+
+  if (newPassword !== confirmPassword) {
+    showMessage(accountPasswordMessage, "New passwords do not match.", "error");
+    return;
+  }
+
+  if (captchaValue.trim().toUpperCase() !== (captchaState.account || "")) {
+    showMessage(accountPasswordMessage, "Incorrect verification code.", "error");
+    generateCaptcha("account");
+    return;
+  }
+
+  currentUser.password = newPassword;
+  const users = readUsers().map((user) =>
+    user.username === currentUser.username ? { ...user, password: newPassword } : user
+  );
+  saveUsers(users);
+  generateCaptcha("account");
+  populateAccountFields();
+  showMessage(accountPasswordMessage, "Password changed successfully.", "success");
+}
+
+function handleAccountDelete() {
+  if (!currentUser) {
+    showLoginView();
+    return;
+  }
+
+  const confirmation = window.confirm(
+    "Deleting your account will remove all data in this browser. This cannot be undone. Continue?"
+  );
+
+  if (!confirmation) return;
+
+  const users = readUsers().filter((user) => user.username !== currentUser.username);
+  saveUsers(users);
+
+  const licenses = readLicenses();
+  delete licenses[currentUser.username];
+  saveLicenses(licenses);
+
+  setSession(null);
+  currentUser = null;
+  licenseSection?.classList.add("hidden");
+  accountSection?.classList.add("hidden");
+  authShell?.classList.remove("hidden");
+  setNavSignoutVisibility(false);
+  showLoginView();
+  showMessage(authMessage, "Your account has been deleted.", "success");
+}
+
 function refreshLicenseList() {
-  licenseList.innerHTML = "";
+  if (!currentUser) return;
+  if (!vehiclesTableBody) return;
+  vehiclesTableBody.innerHTML = "";
   const licenses = readLicenses();
   const userLicenses = licenses[currentUser.username] || [];
 
   if (userLicenses.length === 0) {
-    licenseList.innerHTML = "<li>No license plates registered yet.</li>";
+    const row = document.createElement("tr");
+    const cell = document.createElement("td");
+    cell.colSpan = 6;
+    cell.textContent = "No vehicles registered yet.";
+    row.appendChild(cell);
+    vehiclesTableBody.appendChild(row);
     return;
   }
 
   userLicenses
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     .forEach((item) => {
-      const listItem = document.createElement("li");
-      const left = document.createElement("span");
-      left.innerHTML = `<strong>${item.licenseNumber}</strong> - ${item.vehicleModel}`;
+      const row = document.createElement("tr");
+      const status = item.blacklisted ? "Blacklisted" : "Not blacklisted";
 
+      const cells = [
+        item.licenseNumber,
+        item.make || "",
+        item.model || "",
+        item.year || "",
+        status,
+      ];
+
+      cells.forEach((value) => {
+        const cell = document.createElement("td");
+        cell.textContent = value;
+        row.appendChild(cell);
+      });
+
+      const actionCell = document.createElement("td");
       const removeButton = document.createElement("button");
       removeButton.textContent = "Remove";
       removeButton.addEventListener("click", () => removeLicense(item.licenseNumber));
+      actionCell.appendChild(removeButton);
+      row.appendChild(actionCell);
 
-      listItem.append(left, removeButton);
-      licenseList.appendChild(listItem);
+      vehiclesTableBody.appendChild(row);
     });
 }
 
@@ -661,6 +1031,40 @@ function removeLicense(licenseNumber) {
   saveLicenses(licenses);
   refreshLicenseList();
   showMessage(licenseMessage, "License plate removed.", "success");
+}
+
+function handleNavVehicles(event) {
+  event.preventDefault();
+  if (currentUser) {
+    enterLicenseMode();
+    return;
+  }
+
+  setNavSignoutVisibility(false);
+  if (licenseSection) {
+    licenseSection.classList.add("hidden");
+  }
+  if (accountSection) {
+    accountSection.classList.add("hidden");
+  }
+  if (authShell) {
+    authShell.classList.remove("hidden");
+  }
+  showLoginView();
+}
+
+function handleNavAccount(event) {
+  event.preventDefault();
+  if (currentUser) {
+    enterAccountMode();
+    return;
+  }
+
+  setNavSignoutVisibility(false);
+  licenseSection?.classList.add("hidden");
+  accountSection?.classList.add("hidden");
+  authShell?.classList.remove("hidden");
+  showLoginView();
 }
 
 createAccountLinks.forEach((link) => {
@@ -693,14 +1097,25 @@ registerForm.addEventListener("submit", handleRegister);
 loginForm.addEventListener("submit", handleLogin);
 resetForm?.addEventListener("submit", handleReset);
 licenseForm.addEventListener("submit", handleLicenseSubmit);
-logoutButton.addEventListener("click", exitLicenseMode);
+accountContactForm?.addEventListener("submit", handleAccountContactSubmit);
+accountPasswordForm?.addEventListener("submit", handleAccountPasswordSubmit);
+navVehiclesLink?.addEventListener("click", handleNavVehicles);
+navAccountLink?.addEventListener("click", handleNavAccount);
+navSignoutLink?.addEventListener("click", (event) => {
+  event.preventDefault();
+  exitLicenseMode();
+});
+accountDeleteButton?.addEventListener("click", handleAccountDelete);
 
 document.addEventListener("DOMContentLoaded", () => {
   populateBirthSelects();
+  populateVehicleSelects();
   setupCaptchaControls();
   generateCaptcha("register");
   generateCaptcha("reset");
+  generateCaptcha("account");
   showLoginView();
+  setNavSignoutVisibility(false);
 
   const username = getSession();
   if (!username) {
