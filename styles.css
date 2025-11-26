@@ -134,6 +134,55 @@ main {
   gap: 24px;
 }
 
+.account-logo {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.parallax-ring-logo {
+  position: relative;
+  width: 80px;
+  height: 80px;
+}
+
+.parallax-ring-bg {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(120px 120px at 50% 50%, rgba(255,255,255,0.35), rgba(255,255,255,0) 30%),
+    conic-gradient(
+      from 215deg at 50% 50%,
+      #ff6a3d, #ff9f1c, #ffd166, #8df3ff,
+      #4cc9f0, #4895ef, #8b5cf6, #d946ef,
+      #ff2e93, #ff2e6e, #ff6a3d
+    );
+  background-blend-mode: screen, normal;
+  filter: saturate(125%) contrast(108%) brightness(96%);
+}
+
+#parallax-ring-mask {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.parallax-ring-mark {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  font-size: 28px;
+  font-weight: 600;
+  color: #000;
+}
+
+
 .signin-card .account-logo {
   width: 96px;
   height: 96px;
