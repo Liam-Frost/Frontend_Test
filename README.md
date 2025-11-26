@@ -1,38 +1,182 @@
-# Parallax frontend UI
+# Parallax Web Application
 
+A modern, single-page web application for managing vehicles, user accounts, and blacklist queries — inspired by Apple-style UI aesthetics.
+All data is stored locally in the browser (localStorage), and the entire app operates without any backend.
 
-A static Parallax-themed demo built with vanilla HTML, CSS, and JavaScript to showcase an identifier-first sign-in experience, account creation, password reset, and a simple license registration workflow. All state is persisted in the browser via `localStorage` so the flows can be explored without any backend services.
+---
 
-## Features
+## ✨ Features
 
-- **Identifier-first sign in** – Prompt for an email address or phone number before revealing the password step, closely mirroring the referenced Parallax layout.
-- **Account creation** – Multi-field registration form that validates contact details, birth date, password strength, and captcha input before storing a new profile locally.
-- **Password reset** – Guided reset screen that validates a captcha and simulates sending recovery instructions based on the provided identifier.
-- **License management** – After authentication, users can register license plates, view saved entries, and remove them, with data scoped to the signed-in account.
-- **Apple-inspired styling** – Responsive, glassmorphism-influenced UI with floating labels and Parallax branding as requested.
+### 1. Authentication
 
-## Getting started
+- Email/phone based login
+- Multi-stage sign-in (identifier → password)
+- Password reset flow with CAPTCHA
+- Full account creation with region, birthday, phone, and email
+- Secure client-side validation (regex, length checks, and required fields)
 
-1. Open `index.html` in a browser or serve the repository with any static file server.
-2. Create a new Parallax account or sign in with an existing entry saved in `localStorage`.
-3. Register license plates once authenticated to see them listed in the management panel.
+### 2. Vehicles Management
 
-## Local data model
+After login, users are automatically routed to **Vehicles Management**.
+Features include:
 
-The demo uses three `localStorage` collections:
+- Register vehicles with:
+  - License plate (with regex validation)
+  - Manufacturer
+  - Model
+  - Year
+- Manufacturer/model lists populated dynamically
+- Full list of registered vehicles displayed in a responsive table
+- Toggle blacklist status
+- Delete vehicles individually
+- Data persisted via localStorage
 
-- `ft_users` – Stores registered user profiles.
-- `ft_session` – Tracks the active username for auto sign-in after reloads.
-- `ft_licenses` – Maps usernames to their saved license plates.
+### 3. Account Management
 
-## API reference
+Accessible via navigation bar after login.
+Includes:
 
-The interface does not invoke any remote services. All interactions are handled on the client.
+- Update email, phone, and country calling code
+- Change password (old password validation, new password regex, CAPTCHA)
+- Delete entire account and all stored data
 
-| Method | Endpoint | Purpose |
-| ------ | -------- | ------- |
-| — | — | All authentication, password reset, and license workflows execute entirely in the browser without calling external APIs. |
+### 4. Vehicle Query
 
-## Notes
+A dedicated page for searching any license plate and retrieving its blacklist status.
+Includes:
 
-Because the implementation is fully client-side, the captcha and messaging flows are illustrative only and should be backed by real services in production.
+- License plate pattern validation
+- Instant display of blacklist result
+- Same UI style as Vehicles Management
+
+### 5. Global Navigation
+
+- Always-visible top navigation bar after login
+- Sections: **My Account**, **My Vehicles**, **Query**, **Sign Out**
+- SPA-style navigation (no page reloads)
+
+### 6. Apple-Style UI
+
+The project includes:
+
+- Soft shadows and rounded cards
+- Apple-inspired layout and typography
+- Custom Parallax ring logo with generated conic-gradient background and canvas-mask dots
+- Responsive layout across mobile and desktop
+- Floating labels and animated input fields
+
+### 7. Utility Features
+
+- Refresh button located at the bottom-right corner (fixed position button)
+- All dropdown lists (regions, phone codes, manufacturers, models, years) generated from centralized constants
+- Full form validation with helpful error messages
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| **UI / Layout** | HTML5, CSS3, custom Apple-style components |
+| **Logic** | Vanilla JavaScript (ES6 modules) |
+| **State Storage** | Browser `localStorage` |
+| **Rendering** | DOM manipulation, canvas drawing for ring logo |
+| **Build Tools** | None (pure static) |
+
+The project is fully static and can be deployed on any static hosting service such as GitHub Pages, Netlify, or Vercel.
+
+---
+
+## 📁 Project Structure
+
+```
+project/
+│
+├── index.html # Main single-page HTML shell
+├── styles.css # Apple-style UI styling + responsive layout
+├── app.js # All app logic, navigation, data handling, validation
+├── README.md # Documentation
+└── assets/ # (Optional) Additional icons, images
+```
+
+`index.html` contains all UI sections:
+
+- Authentication container
+- Register form
+- Reset form
+- Vehicles Management
+- Account Management
+- Query page
+
+`app.js` dynamically shows/hides these sections depending on login state.
+
+---
+
+## 🚀 Getting Started
+
+### Requirements
+
+No dependencies, no frameworks—just open the HTML file.
+
+### Run Locally
+
+#### Option 1:
+
+Open index.html in any browser.
+
+#### Option 2 (recommended for module-safe localStorage behavior):
+
+npx serve then open the URL shown in the terminal
+
+---
+
+## 🔧 Customization
+
+### Adding New Regions or Phone Codes
+
+Edit the objects inside:
+
+```
+const REGION_OPTIONS = [ ... ];
+```
+
+### Adding Vehicle Makes and Models
+
+Modify:
+
+```
+const VEHICLE_DATA = {
+"Toyota": [ "Camry", "Corolla", ... ],
+"Mercedes-Benz": [ "C-Class", ... ],
+...
+};
+```
+### Updating UI Theme
+
+Edit color gradients, shadows, and card styles in styles.css.
+
+## 🧪 Known Issues / TODOs
+
+- No backend; authentication is client-side only
+- No encryption of stored passwords (browser localStorage limitation)
+- Manufacturer → model mapping can be extended further
+- Future updates may include:
+- i18n support
+- Real API backend
+- Dark mode
+
+## 📜 License
+
+This project is provided for educational and personal development use.
+Feel free to fork and improve.
+
+## 💡 Credits
+
+Design inspired by Apple ID and Apple UI conventions.
+All implementation done manually without external libraries.
+
+If you have ideas or want additional documentation (API, architecture diagram, code comments, etc.), feel free to ask!
+
+```
+
+```
