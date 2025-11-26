@@ -36,6 +36,9 @@ const navSignoutLink = document.getElementById("nav-signout");
 const monthSelect = document.getElementById("register-birth-month");
 const daySelect = document.getElementById("register-birth-day");
 const yearSelect = document.getElementById("register-birth-year");
+const registerCountrySelect = document.getElementById("register-country");
+const registerPhoneCountrySelect = document.getElementById("register-phone-country");
+const accountPhoneCountrySelect = document.getElementById("account-phone-country");
 const captchaInput = document.getElementById("register-captcha");
 const captchaDisplay = document.getElementById("captcha-display");
 const refreshCaptchaButton = document.getElementById("refresh-captcha");
@@ -368,7 +371,7 @@ function showMessage(element, text, type = "") {
 function updateBirthDayOptions(preserveSelection = true) {
   if (!daySelect) return;
   const previousValue = preserveSelection ? daySelect.value : "";
-  const selectedMonth = parseInt(monthSelect?.value || "", 10);
+  const selectedMonth = parseInt(?.value || "", 10);
   const selectedYear = parseInt(yearSelect?.value || "", 10) || new Date().getFullYear();
   let daysInMonth = 31;
 
@@ -1451,6 +1454,17 @@ accountDeleteButton?.addEventListener("click", (event) => {
 queryForm?.addEventListener("submit", handleQuerySubmit);
 
 document.addEventListener("DOMContentLoaded", () => {
+
+  if (registerCountrySelect) {
+    populateCountrySelect(registerCountrySelect);
+  }
+  if (registerPhoneCountrySelect) {
+    populatePhoneCodeSelect(registerPhoneCountrySelect);
+  }
+  if (accountPhoneCountrySelect) {
+    populatePhoneCodeSelect(accountPhoneCountrySelect);
+  }
+  
   populateBirthSelects();
   populateVehicleSelects();
   setupCaptchaControls();
