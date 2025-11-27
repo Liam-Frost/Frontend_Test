@@ -54,12 +54,6 @@ public class AuthRegisterHandler implements HttpHandler {
             return;
         }
 
-        if (userRepository.isAdminEnabled()
-                && request.getEmail().equalsIgnoreCase(userRepository.getAdminEmail())) {
-            sendJson(exchange, 403, new RegisterResponse(false, "ADMIN_RESERVED"));
-            return;
-        }
-
         if (!isBlank(request.getPhoneCountry()) && !isBlank(request.getPhone())) {
             Optional<User> existingByPhone = userRepository.findByPhone(request.getPhoneCountry(), request.getPhone());
             if (existingByPhone.isPresent()) {

@@ -4,12 +4,10 @@ import com.google.gson.Gson;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
-import parallax.backend.config.AppConfig;
 import parallax.backend.db.UserRepository;
 import parallax.backend.db.VehicleRepository;
 import parallax.backend.model.User;
 import parallax.backend.model.Vehicle;
-import parallax.backend.model.VehicleView;
 
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -25,12 +23,10 @@ public class VehiclesHandler implements HttpHandler {
     private static final Gson gson = new Gson();
     private final VehicleRepository vehicleRepository;
     private final UserRepository userRepository;
-    private final AppConfig config;
 
-    public VehiclesHandler(VehicleRepository vehicleRepository, UserRepository userRepository, AppConfig config) {
+    public VehiclesHandler(VehicleRepository vehicleRepository, UserRepository userRepository) {
         this.vehicleRepository = vehicleRepository;
         this.userRepository = userRepository;
-        this.config = config;
     }
 
     @Override
@@ -58,21 +54,7 @@ public class VehiclesHandler implements HttpHandler {
             return;
         }
 
-        String scope = getQueryParam(exchange.getRequestURI(), "scope");
-        boolean wantsAll = "all".equalsIgnoreCase(scope);
-        boolean isAdmin = userRepository.isAdminUser(username) && config.isAdminEnabled();
-
-        if (wantsAll && isAdmin) {
-            List<VehicleView> allVehicles = vehicleRepository.findAll().stream()
-                    .map(this::mapToView)
-                    .toList();
-            sendJson(exchange, 200, allVehicles);
-            return;
-        }
-
-        List<VehicleView> vehicles = vehicleRepository.findByUsername(username.toLowerCase()).stream()
-                .map(this::mapToView)
-                .toList();
+        List<Vehicle> vehicles = vehicleRepository.findByUsername(username.toLowerCase());
         sendJson(exchange, 200, vehicles);
     }
 
@@ -172,14 +154,6 @@ public class VehiclesHandler implements HttpHandler {
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
-    }
-
-    private VehicleView mapToView(Vehicle vehicle) {
-        if (vehicle == null) {
-            return null;
-        }
-        Optional<User> owner = userRepository.findByEmail(vehicle.getUsername());
-        return VehicleView.from(vehicle, owner.orElse(null));
     }
 
     private void addCorsHeaders(HttpExchange exchange) {

@@ -15,7 +15,6 @@ public class User {
     private String phone;
     private String contactMethod;
     private String createdAt;
-    private boolean admin;
 
     public User() {
     }
@@ -137,13 +136,5 @@ public class User {
 
     public void setCreatedAt(String createdAt) {
         this.createdAt = createdAt;
-    }
-
-    public boolean isAdmin() {
-        return admin;
-    }
-
-    public void setAdmin(boolean admin) {
-        this.admin = admin;
     }
 }
