@@ -5,12 +5,14 @@ public class LoginResponse {
     private String message;
     private String username;
     private String displayName;
+    private boolean admin;
 
-    public LoginResponse(boolean success, String message, String username, String displayName) {
+    public LoginResponse(boolean success, String message, String username, String displayName, boolean admin) {
         this.success = success;
         this.message = message;
         this.username = username;
         this.displayName = displayName;
+        this.admin = admin;
     }
 
     public boolean isSuccess() {
@@ -27,5 +29,9 @@ public class LoginResponse {
 
     public String getDisplayName() {
         return displayName;
+    }
+
+    public boolean isAdmin() {
+        return admin;
     }
 }

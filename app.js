@@ -103,9 +103,16 @@ const querySection = document.getElementById("query-section");
 const queryForm = document.getElementById("query-form");
 const queryLicenseInput = document.getElementById("query-license-number");
 const queryMessage = document.getElementById("query-message");
+const filterLicenseInput = document.getElementById("filter-license");
+const filterMakeInput = document.getElementById("filter-make");
+const filterModelInput = document.getElementById("filter-model");
+const filterYearInput = document.getElementById("filter-year");
+const filterOwnerEmailInput = document.getElementById("filter-owner-email");
+const filterOwnerPhoneInput = document.getElementById("filter-owner-phone");
 
 let currentUser = null;
 let loginStage = "identifier";
+let loadedVehicles = [];
 const captchaState = {
   register: "469P",
   reset: "469P",
@@ -509,35 +516,48 @@ function saveLicenses(licenses) {
   localStorage.setItem(STORAGE_KEYS.licenses, JSON.stringify(licenses));
 }
 
-function setSession(user) {
-  if (user) {
-    localStorage.setItem(
-      STORAGE_KEYS.session,
-      JSON.stringify({ username: user.username })
-    );
-  } else {
-    localStorage.removeItem(STORAGE_KEYS.session);
+  function setSession(user) {
+    if (user) {
+      localStorage.setItem(
+        STORAGE_KEYS.session,
+        JSON.stringify({ username: user.username, isAdmin: !!user.isAdmin })
+      );
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.session);
+    }
   }
-}
 
-function getSession() {
-  try {
-    const data = JSON.parse(localStorage.getItem(STORAGE_KEYS.session));
-    return data?.username || null;
-  } catch (error) {
-    return null;
+  function getSession() {
+    try {
+      const data = JSON.parse(localStorage.getItem(STORAGE_KEYS.session));
+      return data || null;
+    } catch (error) {
+      return null;
+    }
   }
-}
 
-async function fetchUserVehicles(username) {
-  const res = await apiRequest(
-    `/vehicles?username=${encodeURIComponent(username || "")}`
-  );
-  if (!res.ok) {
-    throw new Error("Failed to fetch vehicles");
+  async function fetchUserVehicles(username, isAdmin) {
+    const params = new URLSearchParams({ username: username || "" });
+    if (isAdmin) {
+      params.append("scope", "all");
+    }
+    const res = await apiRequest(`/vehicles?${params.toString()}`);
+    if (!res.ok) {
+      throw new Error("Failed to fetch vehicles");
+    }
+    return res.json();
   }
-  return res.json();
-}
+
+  async function updateBlacklistStatus(licenseNumber, blacklisted) {
+    return api("/vehicles/blacklist", {
+      method: "POST",
+      body: JSON.stringify({
+        username: currentUser.username,
+        licenseNumber,
+        blacklisted,
+      }),
+    });
+  }
 
 function showMessage(element, text, type = "") {
   element.textContent = text;
@@ -1119,19 +1139,22 @@ async function handleLogin(event) {
     const lower = (result.username || identifier).toLowerCase();
     let user = users.find((u) => u.username === lower || u.email === lower);
 
-    if (!user) {
-      // If this is purely backend-authenticated, we can create a shell user object
-      user = {
-        username: lower,
-        email: lower,
-        displayName: result.displayName || lower,
-      };
-      users.push(user);
-      saveUsers(users);
-    }
+      if (!user) {
+        // If this is purely backend-authenticated, we can create a shell user object
+        user = {
+          username: lower,
+          email: lower,
+          displayName: result.displayName || lower,
+          isAdmin: !!result.isAdmin,
+        };
+        users.push(user);
+        saveUsers(users);
+      }
 
-    currentUser = user;
-    setSession(user);
+      user.isAdmin = !!result.isAdmin;
+      saveUsers(users);
+      currentUser = user;
+      setSession(user);
     loginForm.reset();
     setLoginStage("identifier");
     enterLicenseMode();
@@ -1148,11 +1171,12 @@ async function handleLogin(event) {
 function enterLicenseMode() {
   if (!currentUser) return;
   authShell.classList.add("hidden");
-  licenseSection.classList.remove("hidden");
-  accountSection?.classList.add("hidden");
-  querySection?.classList.add("hidden");
-  setNavSignoutVisibility(true);
-  licenseForm?.reset();
+    licenseSection.classList.remove("hidden");
+    accountSection?.classList.add("hidden");
+    querySection?.classList.add("hidden");
+    setNavSignoutVisibility(true);
+    applyAdminTableVisibility();
+    licenseForm?.reset();
   populateVehicleSelects();
   const name =
     currentUser.displayName ||
@@ -1164,9 +1188,10 @@ function enterLicenseMode() {
 }
 
 function exitLicenseMode() {
-  currentUser = null;
-  setSession(null);
-  licenseSection.classList.add("hidden");
+    currentUser = null;
+    setSession(null);
+    loadedVehicles = [];
+    licenseSection.classList.add("hidden");
   accountSection?.classList.add("hidden");
   querySection?.classList.add("hidden");
   authShell.classList.remove("hidden");
@@ -1224,28 +1249,70 @@ function enterAccountMode() {
   showMessage(accountPasswordMessage, "");
 }
 
-function enterQueryMode() {
-  if (!currentUser) {
-    setNavSignoutVisibility(false);
+  function enterQueryMode() {
+    authShell?.classList.add("hidden");
     licenseSection?.classList.add("hidden");
     accountSection?.classList.add("hidden");
-    querySection?.classList.add("hidden");
-    authShell?.classList.remove("hidden");
-    showLoginView();
-    return;
+    querySection?.classList.remove("hidden");
+    setNavSignoutVisibility(!!currentUser);
+    showMessage(queryMessage, "");
+    queryForm?.reset();
+    if (queryLicenseInput) {
+      queryLicenseInput.focus();
+    }
   }
 
-  authShell?.classList.add("hidden");
-  licenseSection?.classList.add("hidden");
-  accountSection?.classList.add("hidden");
-  querySection?.classList.remove("hidden");
-  setNavSignoutVisibility(true);
-  showMessage(queryMessage, "");
-  queryForm?.reset();
-  if (queryLicenseInput) {
-    queryLicenseInput.focus();
+  async function handleQuerySubmit(event) {
+    event.preventDefault();
+    if (!queryLicenseInput) return;
+
+    const licenseNumber = queryLicenseInput.value.trim().toUpperCase();
+    if (!LICENSE_PATTERN.test(licenseNumber)) {
+      showMessage(queryMessage, "Please enter a valid license plate.", "error");
+      return;
+    }
+
+    try {
+      const response = await api(
+        `/vehicles/query?license=${encodeURIComponent(licenseNumber)}`
+      );
+
+      if (!response.found) {
+        showMessage(
+          queryMessage,
+          `No records found for license plate ${licenseNumber}.`,
+          "error"
+        );
+        return;
+      }
+
+      const vehicle = response.vehicle || {};
+      const status = vehicle.blacklisted ? "Blacklisted" : "Not blacklisted";
+      const ownerParts = [];
+      if (vehicle.ownerEmail) {
+        ownerParts.push(vehicle.ownerEmail);
+      }
+      if (vehicle.ownerPhoneCountry || vehicle.ownerPhone) {
+        ownerParts.push(`${vehicle.ownerPhoneCountry || ""} ${vehicle.ownerPhone || ""}`.trim());
+      }
+      const ownerText = ownerParts.length ? ` (Owner: ${ownerParts.join(" / ")})` : "";
+      const descriptor = [vehicle.make, vehicle.model, vehicle.year]
+        .filter((part) => part)
+        .join(" ");
+      showMessage(
+        queryMessage,
+        `${licenseNumber} – ${descriptor || "Vehicle"} · Status: ${status}${ownerText}`,
+        "success"
+      );
+    } catch (error) {
+      console.error(error);
+      showMessage(
+        queryMessage,
+        "Unable to contact server. Please try again later.",
+        "error"
+      );
+    }
   }
-}
 
 
 async function handleLicenseSubmit(event) {
@@ -1526,99 +1593,197 @@ function handleAccountDelete() {
   showMessage(authMessage, "Your account has been deleted.", "success");
 }
 
-async function refreshLicenseList() {
-  if (!currentUser) return;
-  if (!vehiclesTableBody) return;
-  vehiclesTableBody.innerHTML = "";
+  async function refreshLicenseList() {
+    if (!currentUser) return;
+    if (!vehiclesTableBody) return;
+    vehiclesTableBody.innerHTML = "";
 
-  try {
-    const vehicles = await fetchUserVehicles(currentUser.username);
-    const licenses = readLicenses();
-    licenses[currentUser.username] = vehicles;
-    saveLicenses(licenses);
+    try {
+      const vehicles = await fetchUserVehicles(
+        currentUser.username,
+        currentUser.isAdmin
+      );
+      loadedVehicles = vehicles || [];
+      const licenses = readLicenses();
+      licenses[currentUser.username] = vehicles;
+      saveLicenses(licenses);
 
-    renderVehicleRows(vehicles);
-  } catch (error) {
-    console.error("Failed to fetch vehicles from API", error);
-    const fallbackLicenses = readLicenses();
-    const userLicenses = fallbackLicenses[currentUser.username] || [];
-    renderVehicleRows(userLicenses);
-  }
-}
-
-function renderVehicleRows(vehicles) {
-  if (!vehiclesTableBody) return;
-  const sorted = [...vehicles].sort(
-    (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
-  );
-
-  if (sorted.length === 0) {
-    const row = document.createElement("tr");
-    const cell = document.createElement("td");
-    cell.colSpan = 6;
-    cell.textContent = "No vehicles registered yet.";
-    row.appendChild(cell);
-    vehiclesTableBody.appendChild(row);
-    return;
+      renderVehicleRows();
+    } catch (error) {
+      console.error("Failed to fetch vehicles from API", error);
+      const fallbackLicenses = readLicenses();
+      loadedVehicles = fallbackLicenses[currentUser.username] || [];
+      renderVehicleRows();
+    }
   }
 
-  sorted.forEach((item) => {
-    const row = document.createElement("tr");
-    const status = item.blacklisted ? "Blacklisted" : "Not blacklisted";
+  function renderVehicleRows() {
+    if (!vehiclesTableBody) return;
+    applyAdminTableVisibility();
+    vehiclesTableBody.innerHTML = "";
+    const columnCount = getVehicleColumnCount();
 
-    const cells = [
-      item.licenseNumber,
-      item.make || "",
-      item.model || "",
-      item.year || "",
-      status,
-    ];
+    const filtered = (loadedVehicles || []).filter((item) =>
+      vehicleMatchesFilters(item)
+    );
 
-    cells.forEach((value) => {
+    const sorted = [...filtered].sort(
+      (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+    );
+
+    if (sorted.length === 0) {
+      const row = document.createElement("tr");
       const cell = document.createElement("td");
-      cell.textContent = value;
+      cell.colSpan = columnCount;
+      cell.textContent = "No vehicles registered yet.";
       row.appendChild(cell);
-    });
-
-    const actionCell = document.createElement("td");
-    const removeButton = document.createElement("button");
-    removeButton.textContent = "Remove";
-    removeButton.addEventListener("click", () => removeLicense(item.licenseNumber));
-    actionCell.appendChild(removeButton);
-    row.appendChild(actionCell);
-
-    vehiclesTableBody.appendChild(row);
-  });
-}
-
-async function removeLicense(licenseNumber) {
-  if (!currentUser) return;
-
-  try {
-    const res = await apiRequest("/vehicles", {
-      method: "DELETE",
-      body: JSON.stringify({
-        username: currentUser.username,
-        licenseNumber,
-      }),
-    });
-
-    if (res.status === 204) {
-      await refreshLicenseList();
-      showMessage(licenseMessage, "License plate removed.", "success");
+      vehiclesTableBody.appendChild(row);
       return;
     }
 
-    const body = await res.json().catch(() => ({}));
-    const errorMsg = body?.message || "Unable to remove license plate.";
-    showMessage(licenseMessage, errorMsg, "error");
-  } catch (error) {
-    console.error(error);
-    showMessage(
-      licenseMessage,
-      error?.message || "Unable to remove license plate.",
-      "error"
-    );
+    sorted.forEach((item) => {
+      const row = document.createElement("tr");
+      const status = item.blacklisted ? "Blacklisted" : "Not blacklisted";
+      const cells = [
+        item.licenseNumber,
+        item.make || "",
+        item.model || "",
+        item.year || "",
+      ];
+
+      cells.forEach((value) => {
+        const cell = document.createElement("td");
+        cell.textContent = value;
+        row.appendChild(cell);
+      });
+
+      if (currentUser?.isAdmin) {
+        const ownerEmailCell = document.createElement("td");
+        ownerEmailCell.textContent = item.ownerEmail || "";
+        row.appendChild(ownerEmailCell);
+
+        const ownerPhoneCell = document.createElement("td");
+        ownerPhoneCell.textContent = formatOwnerPhone(
+          item.ownerPhoneCountry,
+          item.ownerPhone
+        );
+        row.appendChild(ownerPhoneCell);
+      }
+
+      const statusCell = document.createElement("td");
+      statusCell.textContent = status;
+      row.appendChild(statusCell);
+
+      if (currentUser?.isAdmin) {
+        const actionCell = document.createElement("td");
+        const toggleButton = document.createElement("button");
+        toggleButton.textContent = item.blacklisted
+          ? "Remove from blacklist"
+          : "Add to blacklist";
+        toggleButton.addEventListener("click", async () => {
+          try {
+            await updateBlacklistStatus(item.licenseNumber, !item.blacklisted);
+            showMessage(licenseMessage, "Vehicle updated.", "success");
+            await refreshLicenseList();
+          } catch (error) {
+            console.error(error);
+            showMessage(
+              licenseMessage,
+              error?.message || "Unable to update blacklist status.",
+              "error"
+            );
+          }
+        });
+        actionCell.appendChild(toggleButton);
+        row.appendChild(actionCell);
+      }
+
+      vehiclesTableBody.appendChild(row);
+    });
+  }
+
+  async function removeLicense(licenseNumber) {
+    if (!currentUser) return;
+
+    try {
+      const res = await apiRequest("/vehicles", {
+        method: "DELETE",
+        body: JSON.stringify({
+          username: currentUser.username,
+          licenseNumber,
+        }),
+      });
+
+      if (res.status === 204) {
+        await refreshLicenseList();
+        showMessage(licenseMessage, "License plate removed.", "success");
+        return;
+      }
+
+      const body = await res.json().catch(() => ({}));
+      const errorMsg = body?.message || "Unable to remove license plate.";
+      showMessage(licenseMessage, errorMsg, "error");
+    } catch (error) {
+      console.error(error);
+      showMessage(
+        licenseMessage,
+        error?.message || "Unable to remove license plate.",
+        "error"
+      );
+    }
+  }
+
+  function applyAdminTableVisibility() {
+    const isAdmin = !!currentUser?.isAdmin;
+    document.querySelectorAll(".admin-only").forEach((el) => {
+      el.style.display = isAdmin ? "" : "none";
+    });
+  }
+
+  function getVehicleColumnCount() {
+    return currentUser?.isAdmin ? 8 : 5;
+  }
+
+  function vehicleMatchesFilters(vehicle) {
+    const filters = {
+      license: filterLicenseInput?.value || "",
+      make: filterMakeInput?.value || "",
+      model: filterModelInput?.value || "",
+      year: filterYearInput?.value || "",
+      ownerEmail: filterOwnerEmailInput?.value || "",
+      ownerPhone: filterOwnerPhoneInput?.value || "",
+    };
+
+    const checks = [
+      matchesFilter(vehicle.licenseNumber, filters.license),
+      matchesFilter(vehicle.make, filters.make),
+      matchesFilter(vehicle.model, filters.model),
+      matchesFilter(vehicle.year, filters.year),
+    ];
+
+    if (currentUser?.isAdmin) {
+      checks.push(
+        matchesFilter(vehicle.ownerEmail, filters.ownerEmail),
+        matchesFilter(
+          formatOwnerPhone(vehicle.ownerPhoneCountry, vehicle.ownerPhone),
+          filters.ownerPhone
+        )
+      );
+    }
+
+    return checks.every(Boolean);
+  }
+
+  function matchesFilter(value, filter) {
+    if (!filter) return true;
+    return String(value || "")
+      .toLowerCase()
+      .includes(String(filter || "").toLowerCase());
+  }
+
+  function formatOwnerPhone(country, phone) {
+    if (!country && !phone) return "";
+    return `${country || ""} ${phone || ""}`.trim();
   }
 }
 
@@ -1711,28 +1876,20 @@ accountDeleteButton?.addEventListener("click", (event) => {
 // Query form
 queryForm?.addEventListener("submit", handleQuerySubmit);
 
-navAccountLink?.addEventListener("click", (event) => {
-  event.preventDefault();
-  enterAccountMode();
-});
-navQueryLink?.addEventListener("click", (event) => {
-  event.preventDefault();
-  enterQueryMode();
-});
-navSignoutLink?.addEventListener("click", (event) => {
-  event.preventDefault();
-  exitLicenseMode();
-});
-accountContactForm?.addEventListener("submit", handleAccountContactSubmit);
-accountPasswordForm?.addEventListener("submit", handleAccountPasswordSubmit);
-accountDeleteButton?.addEventListener("click", (event) => {
-  event.preventDefault();
-  handleAccountDelete();
-});
+  [
+    filterLicenseInput,
+    filterMakeInput,
+    filterModelInput,
+    filterYearInput,
+  filterOwnerEmailInput,
+  filterOwnerPhoneInput,
+].forEach((input) => {
+    input?.addEventListener("input", () => {
+      renderVehicleRows();
+    });
+  });
 
-queryForm?.addEventListener("submit", handleQuerySubmit);
-
-document.addEventListener("DOMContentLoaded", () => {
+  document.addEventListener("DOMContentLoaded", () => {
 
   if (registerCountrySelect) {
     populateCountrySelect(registerCountrySelect);
@@ -1756,17 +1913,25 @@ document.addEventListener("DOMContentLoaded", () => {
   drawParallaxRingLogo();
   window.addEventListener("resize", drawParallaxRingLogo);
 
-  const username = getSession();
-  if (!username) {
+  const session = getSession();
+  if (!session?.username) {
     return;
   }
 
   const users = readUsers();
-  const user = users.find((item) => item.username === username);
-  if (user) {
-    currentUser = user;
-    enterLicenseMode();
-  } else {
-    setSession(null);
+  let user = users.find((item) => item.username === session.username);
+  if (!user) {
+    user = {
+      username: session.username,
+      email: session.username,
+      displayName: session.username,
+      isAdmin: !!session.isAdmin,
+    };
+    users.push(user);
+    saveUsers(users);
   }
+
+  user.isAdmin = session.isAdmin || user.isAdmin;
+  currentUser = user;
+  enterLicenseMode();
 });

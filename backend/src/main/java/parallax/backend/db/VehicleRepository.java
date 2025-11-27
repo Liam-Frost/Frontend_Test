@@ -13,6 +13,14 @@ public class VehicleRepository {
     // TODO: replace in-memory map with real SQLite queries using DataSource
     private final Map<String, List<Vehicle>> vehiclesByUser = new ConcurrentHashMap<>();
 
+    public List<Vehicle> findAll() {
+        // TODO: replace with SELECT * FROM vehicles when SQLite is added
+        return vehiclesByUser.values().stream()
+                .flatMap(List::stream)
+                .map(this::copyVehicle)
+                .toList();
+    }
+
     public List<Vehicle> findByUsername(String username) {
         if (username == null) {
             return Collections.emptyList();
@@ -28,6 +36,20 @@ public class VehicleRepository {
         // TODO: replace with SELECT query filtered by username + license
         return vehiclesByUser.getOrDefault(username.toLowerCase(), Collections.emptyList())
                 .stream()
+                .filter(v -> licenseNumber.equalsIgnoreCase(v.getLicenseNumber()))
+                .findFirst();
+    }
+
+    public Optional<Vehicle> findByOwnerAndPlate(String username, String licenseNumber) {
+        return findByUsernameAndLicense(username, licenseNumber);
+    }
+
+    public Optional<Vehicle> findByPlate(String licenseNumber) {
+        if (licenseNumber == null) {
+            return Optional.empty();
+        }
+        return vehiclesByUser.values().stream()
+                .flatMap(List::stream)
                 .filter(v -> licenseNumber.equalsIgnoreCase(v.getLicenseNumber()))
                 .findFirst();
     }
@@ -51,5 +73,23 @@ public class VehicleRepository {
             return;
         }
         list.removeIf(v -> licenseNumber.equalsIgnoreCase(v.getLicenseNumber()));
+    }
+
+    public Optional<Vehicle> updateBlacklist(String ownerUsername, String licenseNumber, boolean blacklisted) {
+        Optional<Vehicle> vehicle = findByUsernameAndLicense(ownerUsername, licenseNumber);
+        vehicle.ifPresent(v -> v.setBlacklisted(blacklisted));
+        return vehicle.map(this::copyVehicle);
+    }
+
+    private Vehicle copyVehicle(Vehicle source) {
+        Vehicle copy = new Vehicle();
+        copy.setUsername(source.getUsername());
+        copy.setLicenseNumber(source.getLicenseNumber());
+        copy.setMake(source.getMake());
+        copy.setModel(source.getModel());
+        copy.setYear(source.getYear());
+        copy.setBlacklisted(source.isBlacklisted());
+        copy.setCreatedAt(source.getCreatedAt());
+        return copy;
     }
 }

@@ -1,5 +1,6 @@
 package parallax.backend.db;
 
+import parallax.backend.config.AppConfig;
 import parallax.backend.model.User;
 
 import java.util.Map;
@@ -10,11 +11,25 @@ import java.util.stream.Collectors;
 public class UserRepository {
     // TODO: replace in-memory map with real SQLite queries using DataSource
     private final Map<String, User> users = new ConcurrentHashMap<>();
+    private final String adminEmail;
+    private final boolean adminEnabled;
 
-    public UserRepository() {
+    public UserRepository(AppConfig config) {
         // TODO: replace in-memory map with real SQLite queries using DataSource
         User demo = new User("demo@parallax.test", "demo@parallax.test", "Demo User", "DemoPass123");
         users.put(demo.getUsername().toLowerCase(), demo);
+        this.adminEmail = config.getAdminEmail().toLowerCase();
+        this.adminEnabled = config.isAdminEnabled();
+        seedAdmin(config);
+    }
+
+    private void seedAdmin(AppConfig config) {
+        if (!adminEnabled) {
+            return;
+        }
+        User admin = new User(config.getAdminEmail(), config.getAdminEmail(), "Parallax Admin", config.getAdminPassword());
+        admin.setAdmin(true);
+        users.put(admin.getUsername().toLowerCase(), admin);
     }
 
     public Optional<User> findByIdentifierAndPassword(String identifier, String password) {
@@ -68,12 +83,32 @@ public class UserRepository {
         }
         // TODO: replace with INSERT statement against SQLite
         String key = user.getUsername().toLowerCase();
+        if (key.equals(adminEmail)) {
+            // never allow overriding the admin account via normal flows
+            return users.getOrDefault(key, user);
+        }
         users.put(key, user);
         return user;
+    }
+
+    public boolean isAdminUser(String username) {
+        if (username == null) {
+            return false;
+        }
+        User user = users.get(username.toLowerCase());
+        return user != null && user.isAdmin() && adminEnabled;
     }
 
     public Map<String, User> findAllUsers() {
         // Helper primarily for testing/debugging
         return users.values().stream().collect(Collectors.toUnmodifiableMap(User::getUsername, u -> u));
+    }
+
+    public String getAdminEmail() {
+        return adminEmail;
+    }
+
+    public boolean isAdminEnabled() {
+        return adminEnabled;
     }
 }

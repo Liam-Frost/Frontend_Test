@@ -12,14 +12,16 @@ import java.util.concurrent.Executors;
 public class HttpServerApp {
     public static void main(String[] args) throws IOException {
         AppConfig config = new AppConfig();
-        UserRepository userRepository = new UserRepository();
+        UserRepository userRepository = new UserRepository(config);
         VehicleRepository vehicleRepository = new VehicleRepository();
 
         HttpServer server = HttpServer.create(new InetSocketAddress(config.getPort()), 0);
         server.createContext("/api/health", new HealthHandler());
-        server.createContext("/api/auth/login", new AuthLoginHandler(userRepository));
+        server.createContext("/api/auth/login", new AuthLoginHandler(userRepository, config));
         server.createContext("/api/auth/register", new AuthRegisterHandler(userRepository));
-        server.createContext("/api/vehicles", new VehiclesHandler(vehicleRepository, userRepository));
+        server.createContext("/api/vehicles", new VehiclesHandler(vehicleRepository, userRepository, config));
+        server.createContext("/api/vehicles/blacklist", new VehiclesBlacklistHandler(vehicleRepository, userRepository));
+        server.createContext("/api/vehicles/query", new VehiclesQueryHandler(vehicleRepository, userRepository));
         server.setExecutor(Executors.newCachedThreadPool());
 
         System.out.println("Started Parallax backend on port " + config.getPort());

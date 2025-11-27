@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
+import parallax.backend.config.AppConfig;
 import parallax.backend.db.UserRepository;
 import parallax.backend.model.LoginRequest;
 import parallax.backend.model.LoginResponse;
@@ -18,9 +19,11 @@ import java.util.Optional;
 public class AuthLoginHandler implements HttpHandler {
     private static final Gson gson = new Gson();
     private final UserRepository userRepository;
+    private final AppConfig config;
 
-    public AuthLoginHandler(UserRepository userRepository) {
+    public AuthLoginHandler(UserRepository userRepository, AppConfig config) {
         this.userRepository = userRepository;
+        this.config = config;
     }
 
     @Override
@@ -47,18 +50,19 @@ public class AuthLoginHandler implements HttpHandler {
 
         if (request == null || request.getIdentifier() == null || request.getIdentifier().isBlank()
                 || request.getPassword() == null || request.getPassword().isBlank()) {
-            sendJson(exchange, 400, new LoginResponse(false, "Identifier and password are required", null, null));
+            sendJson(exchange, 400, new LoginResponse(false, "Identifier and password are required", null, null, false));
             return;
         }
 
         Optional<User> user = userRepository.findByIdentifierAndPassword(request.getIdentifier(), request.getPassword());
         if (user.isEmpty()) {
-            sendJson(exchange, 401, new LoginResponse(false, "Invalid credentials", null, null));
+            sendJson(exchange, 401, new LoginResponse(false, "Invalid credentials", null, null, false));
             return;
         }
 
         User found = user.get();
-        LoginResponse response = new LoginResponse(true, "Login successful", found.getUsername(), found.getDisplayName());
+        boolean isAdmin = found.isAdmin() && config.isAdminEnabled();
+        LoginResponse response = new LoginResponse(true, "Login successful", found.getUsername(), found.getDisplayName(), isAdmin);
         // TODO: plug in real authentication (sessions / tokens) when SQLite integration arrives
         sendJson(exchange, 200, response);
 
