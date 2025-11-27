@@ -122,7 +122,7 @@ const captchaState = {
   account: "1234",
 };
 
-let allVehicles = [];
+let currentVehicles = [];
 const vehicleFilters = {
   search: "",
   blacklist: "all",
@@ -1177,6 +1177,7 @@ async function handleLogin(event) {
 
 function enterLicenseMode() {
   if (!currentUser) return;
+  setAdminBodyState(isAdminSession());
   authShell.classList.add("hidden");
   licenseSection.classList.remove("hidden");
   accountSection?.classList.add("hidden");
@@ -1198,6 +1199,7 @@ function enterLicenseMode() {
 function exitLicenseMode() {
   currentUser = null;
   setSession(null);
+  setAdminBodyState(false);
   licenseSection.classList.add("hidden");
   accountSection?.classList.add("hidden");
   querySection?.classList.add("hidden");
@@ -1613,6 +1615,11 @@ function handleAccountDelete() {
   showMessage(authMessage, "Your account has been deleted.", "success");
 }
 
+function setAdminBodyState(adminView) {
+  if (typeof document === "undefined" || !document.body) return;
+  document.body.classList.toggle("admin-logged-in", !!adminView);
+}
+
 function renderVehiclesTableHeader(adminView) {
   if (!vehiclesTableHead) return;
   vehiclesTableHead.innerHTML = "";
@@ -1643,6 +1650,8 @@ function renderVehiclesTableHeader(adminView) {
     vehiclesTable.classList.toggle("vehicles-table--admin", adminView);
   }
 
+  setAdminBodyState(adminView);
+
   if (licenseListContainer) {
     licenseListContainer.classList.toggle("admin-view", adminView);
   }
@@ -1665,47 +1674,51 @@ function resetVehicleFiltersForSession() {
   if (vehicleOwnerFilter) vehicleOwnerFilter.value = "";
 }
 
-function applyVehicleFilters() {
+function applyRegisteredVehiclesFilters() {
   const adminView = isAdminSession();
   const search = (vehicleFilters.search || "").trim().toLowerCase();
   const ownerQuery = adminView ? (vehicleFilters.owner || "").trim().toLowerCase() : "";
   const blacklistFilter = vehicleFilters.blacklist || "all";
 
-  const filtered = allVehicles.filter((item) => {
-    const license = (item.licenseNumber || "").toLowerCase();
-    const make = (item.make || "").toLowerCase();
-    const model = (item.model || "").toLowerCase();
-    const ownerEmail = (item.ownerEmail || item.ownerUsername || "").toLowerCase();
-    const ownerPhone = (item.ownerPhone || item.ownerPhoneCountry || "").toLowerCase();
+  let filtered = currentVehicles.slice();
 
-    const matchesSearch =
-      !search ||
-      license.includes(search) ||
-      make.includes(search) ||
-      model.includes(search) ||
-      (adminView && (ownerEmail.includes(search) || ownerPhone.includes(search)));
+  if (search) {
+    filtered = filtered.filter((item) => {
+      const license = (item.licenseNumber || "").toLowerCase();
+      const make = (item.make || "").toLowerCase();
+      const model = (item.model || "").toLowerCase();
+      const ownerEmail = (item.ownerEmail || item.ownerUsername || "").toLowerCase();
+      const ownerPhone = (item.ownerPhone || item.ownerPhoneCountry || "").toLowerCase();
 
-    const matchesOwner =
-      !adminView ||
-      !ownerQuery ||
-      ownerEmail.includes(ownerQuery) ||
-      ownerPhone.includes(ownerQuery);
+      return (
+        license.includes(search) ||
+        make.includes(search) ||
+        model.includes(search) ||
+        (adminView && (ownerEmail.includes(search) || ownerPhone.includes(search)))
+      );
+    });
+  }
 
-    const matchesBlacklist =
-      blacklistFilter === "all" ||
-      (blacklistFilter === "active" && item.blacklisted) ||
-      (blacklistFilter === "clear" && !item.blacklisted);
+  if (adminView && ownerQuery) {
+    filtered = filtered.filter((item) => {
+      const ownerEmail = (item.ownerEmail || item.ownerUsername || "").toLowerCase();
+      const ownerPhone = (item.ownerPhone || item.ownerPhoneCountry || "").toLowerCase();
+      return ownerEmail.includes(ownerQuery) || ownerPhone.includes(ownerQuery);
+    });
+  }
 
-    return matchesSearch && matchesOwner && matchesBlacklist;
-  });
+  if (blacklistFilter === "active") {
+    filtered = filtered.filter((item) => item.blacklisted);
+  } else if (blacklistFilter === "clear") {
+    filtered = filtered.filter((item) => !item.blacklisted);
+  }
 
-  renderVehicleRows(filtered, adminView);
+  renderRegisteredVehicles(filtered, adminView);
 }
 
 async function refreshLicenseList() {
   if (!currentUser) return;
   if (!vehiclesTableBody) return;
-  vehiclesTableBody.innerHTML = "";
   renderVehiclesTableHeader(isAdminSession());
 
   try {
@@ -1714,19 +1727,21 @@ async function refreshLicenseList() {
     licenses[currentUser.username] = vehicles;
     saveLicenses(licenses);
 
-    allVehicles = vehicles;
-    applyVehicleFilters();
+    currentVehicles = vehicles;
+    applyRegisteredVehiclesFilters();
   } catch (error) {
     console.error("Failed to fetch vehicles from API", error);
     const fallbackLicenses = readLicenses();
     const userLicenses = fallbackLicenses[currentUser.username] || [];
-    allVehicles = userLicenses;
-    applyVehicleFilters();
+
+    currentVehicles = userLicenses;
+    applyRegisteredVehiclesFilters();
   }
 }
 
-function renderVehicleRows(vehicles, adminView) {
+function renderRegisteredVehicles(vehicles, adminView) {
   if (!vehiclesTableBody) return;
+  vehiclesTableBody.innerHTML = "";
   const colCount = adminView ? 8 : 6;
   const sorted = [...vehicles].sort(
     (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
@@ -1752,9 +1767,12 @@ function renderVehicleRows(vehicles, adminView) {
       cells.push(item.ownerPhone || item.ownerPhoneCountry || "");
     }
 
-    cells.forEach((value) => {
+    cells.forEach((value, index) => {
       const cell = document.createElement("td");
       cell.textContent = value;
+      if (adminView && (index === 5 || index === 6)) {
+        cell.classList.add("owner-cell");
+      }
       row.appendChild(cell);
     });
 
@@ -1900,19 +1918,42 @@ loginForm.addEventListener("submit", handleLogin);
 resetForm?.addEventListener("submit", handleReset);
 licenseForm.addEventListener("submit", handleLicenseSubmit);
 
-vehicleSearchInput?.addEventListener("input", () => {
-  vehicleFilters.search = vehicleSearchInput.value || "";
-  applyVehicleFilters();
+vehicleSearchInput?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    vehicleFilters.search = vehicleSearchInput.value || "";
+    applyRegisteredVehiclesFilters();
+  }
+
+  if (event.key === "Escape") {
+    vehicleSearchInput.value = "";
+    vehicleFilters.search = "";
+    applyRegisteredVehiclesFilters();
+  }
 });
 
 vehicleBlacklistSelect?.addEventListener("change", () => {
   vehicleFilters.blacklist = vehicleBlacklistSelect.value || "all";
-  applyVehicleFilters();
+  applyRegisteredVehiclesFilters();
+});
+
+vehicleOwnerFilter?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    vehicleFilters.owner = vehicleOwnerFilter.value || "";
+    applyRegisteredVehiclesFilters();
+  }
+
+  if (event.key === "Escape") {
+    vehicleOwnerFilter.value = "";
+    vehicleFilters.owner = "";
+    applyRegisteredVehiclesFilters();
+  }
 });
 
 vehicleOwnerFilter?.addEventListener("input", () => {
   vehicleFilters.owner = vehicleOwnerFilter.value || "";
-  applyVehicleFilters();
+  applyRegisteredVehiclesFilters();
 });
 
 // My Vehicles

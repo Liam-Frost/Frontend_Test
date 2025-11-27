@@ -664,7 +664,9 @@ main {
 }
 
 .license-panel {
-  margin-top: 80px;
+  margin: 80px auto 0;
+  width: 100%;
+  max-width: 1200px;
   background: #fff;
   border-radius: 22px;
   border: 1px solid rgba(210, 210, 215, 0.7);
@@ -822,15 +824,16 @@ main {
   display: flex;
 }
 
-.table-wrapper {
+.table-scroll-wrapper {
   margin-top: 12px;
+  width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
 
 .vehicles-table {
   width: 100%;
-  min-width: 720px;
+  min-width: 850px;
   border-collapse: collapse;
   table-layout: fixed;
   background: rgba(245, 245, 247, 0.8);
@@ -840,7 +843,11 @@ main {
 }
 
 .vehicles-table--admin {
-  min-width: 1000px;
+  min-width: 1050px;
+}
+
+body.admin-logged-in .vehicles-table {
+  min-width: 1050px;
 }
 
 .vehicles-table thead {
@@ -853,6 +860,12 @@ main {
   text-align: left;
   font-size: 15px;
   border-bottom: 1px solid rgba(210, 210, 215, 0.6);
+}
+
+.vehicles-table td.owner-cell {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .vehicles-table tr:last-child td {
