@@ -1286,24 +1286,45 @@ function enterAccountMode() {
   }
 }
 
-function enterQueryMode() {
-  if (!currentUser) {
-    setNavSignoutVisibility(false);
-    licenseSection?.classList.add("hidden");
-    accountSection?.classList.add("hidden");
-    querySection?.classList.add("hidden");
-    authShell?.classList.remove("hidden");
-    showLoginView();
-    return;
-  }
+  const admin = isAdminSession();
+  const contactElements = [
+    accountEmailInput,
+    accountPhoneCountrySelect,
+    accountPhoneInput,
+    accountCurrentPasswordInput,
+    accountContactForm?.querySelector("button[type='submit']"),
+  ];
+  contactElements.forEach((el) => {
+    if (el) el.disabled = admin;
+  });
 
+  const passwordElements = [
+    accountOldPasswordInput,
+    accountNewPasswordInput,
+    accountConfirmPasswordInput,
+    accountCaptchaInput,
+    accountPasswordForm?.querySelector("button[type='submit']"),
+    accountRefreshCaptchaButton,
+  ];
+  passwordElements.forEach((el) => {
+    if (el) el.disabled = admin;
+  });
+
+  if (accountDeleteButton) {
+    accountDeleteButton.disabled = admin;
+  }
+}
+
+function enterQueryMode() {
   authShell?.classList.add("hidden");
   licenseSection?.classList.add("hidden");
   accountSection?.classList.add("hidden");
   querySection?.classList.remove("hidden");
-  setNavSignoutVisibility(true);
+  setNavSignoutVisibility(!!currentUser);
   showMessage(queryMessage, "");
   queryForm?.reset();
+  showMessage(queryImageResult, "");
+  queryImageForm?.reset();
   if (queryLicenseInput) {
     queryLicenseInput.focus();
   }
@@ -1384,53 +1405,130 @@ async function handleLicenseSubmit(event) {
 function handleQuerySubmit(event) {
   event.preventDefault();
 
-  if (!currentUser) {
-    showLoginView();
-    return;
-  }
+  if (!queryLicenseInput || !queryMessage) return;
 
-  const raw = (queryLicenseInput?.value || "").trim().toUpperCase();
+  const raw = queryLicenseInput.value.trim().toUpperCase();
+
   if (!LICENSE_PATTERN.test(raw)) {
     showMessage(
       queryMessage,
-      "Enter a valid license plate (1–7 chars, A–Z, 0–9, or hyphen).",
+      "Enter a valid license plate (1–7 characters A–Z, 0–9 or hyphen).",
       "error"
     );
     return;
   }
 
-  const licenses = readLicenses();
-  let found = false;
-  let blacklisted = false;
+  showMessage(queryMessage, "Checking license status…", "");
 
-  Object.values(licenses).forEach((userLicenses) => {
-    (userLicenses || []).forEach((entry) => {
-      if (entry.licenseNumber === raw) {
-        found = true;
-        if (entry.blacklisted) {
-          blacklisted = true;
-        }
+  apiRequest(`/vehicles/query?license=${encodeURIComponent(raw)}`, {
+    method: "GET",
+  })
+    .then((response) => response.json())
+    .then((data) => {
+      if (!data || data.success === false) {
+        showMessage(
+          queryMessage,
+          data?.message || "Unable to check this license plate right now.",
+          "error"
+        );
+        return;
       }
-    });
-  });
 
-  if (!found) {
+      if (data.found === false) {
+        showMessage(queryMessage, "This plate is not registered in Parallax.", "error");
+        return;
+      }
+
+      const plate = data.licenseNumber || raw;
+      const blacklisted = !!data.blacklisted;
+      const statusMessage = blacklisted
+        ? `${plate} is registered and is currently blacklisted.`
+        : `${plate} is registered and is not blacklisted.`;
+
+      showMessage(queryMessage, statusMessage, blacklisted ? "error" : "success");
+    })
+    .catch(() => {
+      showMessage(
+        queryMessage,
+        "Unable to contact server. Please try again later.",
+        "error"
+      );
+    });
+}
+
+async function handleQueryImageSubmit(event) {
+  event.preventDefault();
+  if (!queryImageInput || !queryImageResult) return;
+
+  const file = queryImageInput.files?.[0];
+  if (!file) {
+    showMessage(queryImageResult, "Please upload an image of a license plate.", "error");
+    return;
+  }
+
+  showMessage(queryImageResult, "Analyzing image…", "");
+
+  try {
+    const base = (window.APP_CONFIG && window.APP_CONFIG.API_BASE) || "";
+    const response = await fetch(`${base}/vehicles/query-image`, {
+      method: "POST",
+      headers: {
+        "Content-Type": file.type || "application/octet-stream",
+      },
+      // Send raw bytes as expected by the backend, not multipart/form-data.
+      body: file,
+    });
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok || !data) {
+      throw new Error();
+    }
+
+    if (data.success === false) {
+      showMessage(
+        queryImageResult,
+        data.message || "Unable to analyze image at this time.",
+        "error"
+      );
+      return;
+    }
+
+    if (!data.plateFound) {
+      showMessage(
+        queryImageResult,
+        data.message || "No readable license plate was found in the image.",
+        "error"
+      );
+      return;
+    }
+
+    const plate = data.licenseNumber || "the detected plate";
+    let text = data.message || "Detected plate.";
+    let type = "success";
+
+    if (data.foundInSystem) {
+      if (data.blacklisted) {
+        text =
+          data.message ||
+          `Detected plate: ${plate}. This plate is registered and currently blacklisted.`;
+        type = "error";
+      } else {
+        text =
+          data.message ||
+          `Detected plate: ${plate}. This plate is registered and not blacklisted.`;
+      }
+    } else {
+      text = data.message || `Detected plate: ${plate}. This plate is not registered in Parallax.`;
+    }
+
+    showMessage(queryImageResult, text, type);
+  } catch (error) {
+    console.error(error);
     showMessage(
-      queryMessage,
-      `License ${raw} was not found in the system.`,
-      "success"
-    );
-  } else if (blacklisted) {
-    showMessage(
-      queryMessage,
-      `License ${raw} is currently blacklisted.`,
-      "success"
-    );
-  } else {
-    showMessage(
-      queryMessage,
-      `License ${raw} is not blacklisted.`,
-      "success"
+      queryImageResult,
+      "Unable to analyze image at this time. Please try again later.",
+      "error"
     );
   }
 }
@@ -1990,27 +2088,7 @@ accountDeleteButton?.addEventListener("click", (event) => {
 
 // Query form
 queryForm?.addEventListener("submit", handleQuerySubmit);
-
-navAccountLink?.addEventListener("click", (event) => {
-  event.preventDefault();
-  enterAccountMode();
-});
-navQueryLink?.addEventListener("click", (event) => {
-  event.preventDefault();
-  enterQueryMode();
-});
-navSignoutLink?.addEventListener("click", (event) => {
-  event.preventDefault();
-  exitLicenseMode();
-});
-accountContactForm?.addEventListener("submit", handleAccountContactSubmit);
-accountPasswordForm?.addEventListener("submit", handleAccountPasswordSubmit);
-accountDeleteButton?.addEventListener("click", (event) => {
-  event.preventDefault();
-  handleAccountDelete();
-});
-
-queryForm?.addEventListener("submit", handleQuerySubmit);
+queryImageForm?.addEventListener("submit", handleQueryImageSubmit);
 
 document.addEventListener("DOMContentLoaded", () => {
 

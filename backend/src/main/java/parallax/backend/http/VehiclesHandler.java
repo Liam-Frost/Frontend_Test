@@ -7,7 +7,6 @@ import com.sun.net.httpserver.HttpHandler;
 import parallax.backend.config.AppConfig;
 import parallax.backend.db.UserRepository;
 import parallax.backend.db.VehicleRepository;
-import parallax.backend.model.User;
 import parallax.backend.model.Vehicle;
 import parallax.backend.model.VehicleWithOwner;
 
@@ -74,6 +73,44 @@ public class VehiclesHandler implements HttpHandler {
 
         List<Vehicle> vehicles = vehicleRepository.findByUsername(username.toLowerCase());
         sendJson(exchange, 200, vehicles);
+    }
+
+    private void handleQuery(HttpExchange exchange) throws IOException {
+        String license = getQueryParam(exchange.getRequestURI(), "license");
+        if (isBlank(license)) {
+            sendJson(exchange, 400, Map.of(
+                    "success", false,
+                    "message", "License plate is required."
+            ));
+            return;
+        }
+
+        String normalized = normalizeLicense(license);
+        if (!isValidLicense(normalized)) {
+            sendJson(exchange, 400, Map.of(
+                    "success", false,
+                    "message", "Enter a valid license plate (1–7 characters A–Z, 0–9, or hyphen)."
+            ));
+            return;
+        }
+        Optional<Vehicle> match = vehicleRepository.findByPlate(normalized);
+        if (match.isEmpty()) {
+            sendJson(exchange, 200, Map.of(
+                    "success", true,
+                    "found", false,
+                    "licenseNumber", normalized,
+                    "blacklisted", false
+            ));
+            return;
+        }
+
+        Vehicle vehicle = match.get();
+        Map<String, Object> response = new java.util.LinkedHashMap<>();
+        response.put("success", true);
+        response.put("found", true);
+        response.put("licenseNumber", vehicle.getLicenseNumber());
+        response.put("blacklisted", vehicle.isBlacklisted());
+        sendJson(exchange, 200, response);
     }
 
     private void handlePost(HttpExchange exchange) throws IOException {
@@ -197,6 +234,10 @@ public class VehiclesHandler implements HttpHandler {
         }
         String trimmed = licenseNumber.trim();
         return trimmed.length() >= 1 && trimmed.length() <= 7 && trimmed.matches("[A-Z0-9-]+");
+    }
+
+    private String normalizeLicense(String licenseNumber) {
+        return licenseNumber == null ? null : licenseNumber.trim().toUpperCase();
     }
 
     private String getQueryParam(URI uri, String key) {

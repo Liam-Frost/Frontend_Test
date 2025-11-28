@@ -658,6 +658,12 @@ main {
   color: #d70015;
 }
 
+.query-divider {
+  height: 1px;
+  background: rgba(210, 210, 215, 0.7);
+  margin: 12px 0 4px;
+}
+
 .support-box {
   font-size: 14px;
   color: rgba(29, 29, 31, 0.7);
@@ -833,12 +839,21 @@ main {
 
 .vehicles-table {
   width: 100%;
+  min-width: 850px;
   border-collapse: collapse;
   table-layout: fixed;
   background: rgba(245, 245, 247, 0.8);
   border: 1px solid rgba(210, 210, 215, 0.6);
   border-radius: 14px;
   overflow: hidden;
+}
+
+.vehicles-table--admin {
+  min-width: 1050px;
+}
+
+body.admin-logged-in .vehicles-table {
+  min-width: 1050px;
 }
 
 .vehicles-table thead {
