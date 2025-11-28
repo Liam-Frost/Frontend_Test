@@ -28,28 +28,9 @@ public class VehicleRepository {
             return Optional.empty();
         }
         // TODO: replace with SELECT query filtered by username + license
-        String normalized = normalizeLicense(licenseNumber);
         return vehiclesByUser.getOrDefault(username.toLowerCase(), Collections.emptyList())
                 .stream()
-                .filter(v -> normalized.equals(normalizeLicense(v.getLicenseNumber())))
-                .findFirst();
-    }
-
-    public Optional<Vehicle> findByLicense(String licenseNumber) {
-        if (licenseNumber == null) {
-            return Optional.empty();
-        }
-        return findByPlate(licenseNumber);
-    }
-
-    public Optional<Vehicle> findByPlate(String licenseNumber) {
-        if (licenseNumber == null) {
-            return Optional.empty();
-        }
-        String normalized = normalizeLicense(licenseNumber);
-        return vehiclesByUser.values().stream()
-                .flatMap(List::stream)
-                .filter(v -> normalized.equals(normalizeLicense(v.getLicenseNumber())))
+                .filter(v -> licenseNumber.equalsIgnoreCase(v.getLicenseNumber()))
                 .findFirst();
     }
 
@@ -81,64 +62,7 @@ public class VehicleRepository {
         if (list == null) {
             return;
         }
-        String normalized = normalizeLicense(licenseNumber);
-        list.removeIf(v -> normalized.equals(normalizeLicense(v.getLicenseNumber())));
-    }
-
-    public boolean removeByLicense(String licenseNumber) {
-        if (licenseNumber == null) {
-            return false;
-        }
-        String normalized = normalizeLicense(licenseNumber);
-        boolean removed = false;
-        for (List<Vehicle> vehicles : vehiclesByUser.values()) {
-            removed |= vehicles.removeIf(v -> normalized.equals(normalizeLicense(v.getLicenseNumber())));
-        }
-        return removed;
-    }
-
-    public Optional<Vehicle> updateBlacklistStatus(String licenseNumber, boolean blacklisted) {
-        Optional<Vehicle> match = findByPlate(licenseNumber);
-        match.ifPresent(vehicle -> vehicle.setBlacklisted(blacklisted));
-        return match;
-    }
-
-    public List<Vehicle> findAll() {
-        return vehiclesByUser.values().stream()
-                .flatMap(List::stream)
-                .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
-    }
-
-    public List<VehicleWithOwner> findAllWithOwners(UserRepository userRepository) {
-        List<VehicleWithOwner> results = new ArrayList<>();
-        for (Vehicle vehicle : findAll()) {
-            VehicleWithOwner enriched = new VehicleWithOwner();
-            enriched.setUsername(vehicle.getUsername());
-            enriched.setLicenseNumber(vehicle.getLicenseNumber());
-            enriched.setMake(vehicle.getMake());
-            enriched.setModel(vehicle.getModel());
-            enriched.setYear(vehicle.getYear());
-            enriched.setBlacklisted(vehicle.isBlacklisted());
-            enriched.setCreatedAt(vehicle.getCreatedAt());
-
-            String ownerKey = vehicle.getUsername();
-            if (ownerKey != null) {
-                userRepository.findByEmail(ownerKey).ifPresent((User user) -> {
-                    enriched.setOwnerUsername(user.getUsername());
-                    enriched.setOwnerEmail(user.getEmail());
-                    enriched.setOwnerPhone(user.getPhoneCountry() != null
-                            ? user.getPhoneCountry() + (user.getPhone() == null ? "" : user.getPhone())
-                            : user.getPhone());
-                    enriched.setOwnerPhoneCountry(user.getPhoneCountry());
-                });
-            }
-            results.add(enriched);
-        }
-        return results;
-    }
-
-    private String normalizeLicense(String licenseNumber) {
-        return licenseNumber == null ? null : licenseNumber.trim().toUpperCase();
+        list.removeIf(v -> licenseNumber.equalsIgnoreCase(v.getLicenseNumber()));
     }
 
     public boolean removeByLicense(String licenseNumber) {

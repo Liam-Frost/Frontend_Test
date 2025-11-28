@@ -658,12 +658,6 @@ main {
   color: #d70015;
 }
 
-.query-divider {
-  height: 1px;
-  background: rgba(210, 210, 215, 0.7);
-  margin: 12px 0 4px;
-}
-
 .support-box {
   font-size: 14px;
   color: rgba(29, 29, 31, 0.7);
