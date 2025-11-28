@@ -53,6 +53,16 @@ public class VehicleRepository {
                 .findFirst();
     }
 
+    public Optional<Vehicle> findByLicense(String licenseNumber) {
+        if (licenseNumber == null) {
+            return Optional.empty();
+        }
+        return vehiclesByUser.values().stream()
+                .flatMap(List::stream)
+                .filter(v -> licenseNumber.equalsIgnoreCase(v.getLicenseNumber()))
+                .findFirst();
+    }
+
     public void addVehicle(Vehicle vehicle) {
         if (vehicle == null || vehicle.getUsername() == null) {
             throw new IllegalArgumentException("Vehicle and username must not be null");
@@ -129,5 +139,56 @@ public class VehicleRepository {
 
     private String normalizeLicense(String licenseNumber) {
         return licenseNumber == null ? null : licenseNumber.trim().toUpperCase();
+    }
+
+    public boolean removeByLicense(String licenseNumber) {
+        if (licenseNumber == null) {
+            return false;
+        }
+        boolean removed = false;
+        for (List<Vehicle> vehicles : vehiclesByUser.values()) {
+            removed |= vehicles.removeIf(v -> licenseNumber.equalsIgnoreCase(v.getLicenseNumber()));
+        }
+        return removed;
+    }
+
+    public Optional<Vehicle> updateBlacklistStatus(String licenseNumber, boolean blacklisted) {
+        Optional<Vehicle> match = findByLicense(licenseNumber);
+        match.ifPresent(vehicle -> vehicle.setBlacklisted(blacklisted));
+        return match;
+    }
+
+    public List<Vehicle> findAll() {
+        return vehiclesByUser.values().stream()
+                .flatMap(List::stream)
+                .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
+    }
+
+    public List<VehicleWithOwner> findAllWithOwners(UserRepository userRepository) {
+        List<VehicleWithOwner> results = new ArrayList<>();
+        for (Vehicle vehicle : findAll()) {
+            VehicleWithOwner enriched = new VehicleWithOwner();
+            enriched.setUsername(vehicle.getUsername());
+            enriched.setLicenseNumber(vehicle.getLicenseNumber());
+            enriched.setMake(vehicle.getMake());
+            enriched.setModel(vehicle.getModel());
+            enriched.setYear(vehicle.getYear());
+            enriched.setBlacklisted(vehicle.isBlacklisted());
+            enriched.setCreatedAt(vehicle.getCreatedAt());
+
+            String ownerKey = vehicle.getUsername();
+            if (ownerKey != null) {
+                userRepository.findByEmail(ownerKey).ifPresent((User user) -> {
+                    enriched.setOwnerUsername(user.getUsername());
+                    enriched.setOwnerEmail(user.getEmail());
+                    enriched.setOwnerPhone(user.getPhoneCountry() != null
+                            ? user.getPhoneCountry() + (user.getPhone() == null ? "" : user.getPhone())
+                            : user.getPhone());
+                    enriched.setOwnerPhoneCountry(user.getPhoneCountry());
+                });
+            }
+            results.add(enriched);
+        }
+        return results;
     }
 }

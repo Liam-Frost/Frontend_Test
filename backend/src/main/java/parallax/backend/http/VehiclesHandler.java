@@ -44,13 +44,7 @@ public class VehiclesHandler implements HttpHandler {
 
         String path = exchange.getRequestURI().getPath();
         switch (method.toUpperCase()) {
-            case "GET" -> {
-                if (path.endsWith("/query")) {
-                    handleQuery(exchange);
-                } else {
-                    handleGet(exchange);
-                }
-            }
+            case "GET" -> handleGet(exchange);
             case "POST" -> {
                 if (path.endsWith("/blacklist")) {
                     handleBlacklist(exchange);

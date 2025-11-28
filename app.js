@@ -106,9 +106,6 @@ const querySection = document.getElementById("query-section");
 const queryForm = document.getElementById("query-form");
 const queryLicenseInput = document.getElementById("query-license-number");
 const queryMessage = document.getElementById("query-message");
-const queryImageForm = document.getElementById("query-image-form");
-const queryImageInput = document.getElementById("query-image-input");
-const queryImageResult = document.getElementById("query-image-result");
 const vehicleFiltersContainer = document.getElementById("vehicle-filters");
 const vehicleSearchInput = document.getElementById("vehicle-filter-search");
 const vehicleBlacklistSelect = document.getElementById("vehicle-filter-blacklist");
@@ -1259,6 +1256,35 @@ function enterAccountMode() {
   generateCaptcha("account");
   showMessage(accountContactMessage, "");
   showMessage(accountPasswordMessage, "");
+
+  const admin = isAdminSession();
+  const contactElements = [
+    accountEmailInput,
+    accountPhoneCountrySelect,
+    accountPhoneInput,
+    accountCurrentPasswordInput,
+    accountContactForm?.querySelector("button[type='submit']"),
+  ];
+  contactElements.forEach((el) => {
+    if (el) el.disabled = admin;
+  });
+
+  const passwordElements = [
+    accountOldPasswordInput,
+    accountNewPasswordInput,
+    accountConfirmPasswordInput,
+    accountCaptchaInput,
+    accountPasswordForm?.querySelector("button[type='submit']"),
+    accountRefreshCaptchaButton,
+  ];
+  passwordElements.forEach((el) => {
+    if (el) el.disabled = admin;
+  });
+
+  if (accountDeleteButton) {
+    accountDeleteButton.disabled = admin;
+  }
+}
 
   const admin = isAdminSession();
   const contactElements = [

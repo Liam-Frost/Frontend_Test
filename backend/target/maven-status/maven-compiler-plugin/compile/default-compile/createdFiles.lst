@@ -12,4 +12,5 @@ parallax\backend\model\LoginResponse.class
 parallax\backend\db\DataSource.class
 parallax\backend\model\Vehicle.class
 parallax\backend\model\User.class
+parallax\backend\model\VehicleWithOwner.class
 parallax\backend\model\RegisterRequest.class
