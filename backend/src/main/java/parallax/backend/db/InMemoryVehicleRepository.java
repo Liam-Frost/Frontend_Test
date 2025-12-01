@@ -11,6 +11,14 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * In-memory implementation of {@link VehicleRepository} for local development and testing.
+ * <p>
+ * Vehicle data is stored per user in synchronized lists held in memory, so all registrations and
+ * blacklist flags are cleared when the server restarts. A persistent SQLite-backed repository will
+ * replace this class once available.
+ * </p>
+ */
 public class InMemoryVehicleRepository implements VehicleRepository {
     // TODO: replace in-memory map with real SQLite queries using DataSource
     private final Map<String, List<Vehicle>> vehiclesByUser = new ConcurrentHashMap<>();
@@ -22,6 +30,13 @@ public class InMemoryVehicleRepository implements VehicleRepository {
         return licenseNumber.trim().toUpperCase();
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Vehicles are moved between user buckets, and the username field on each vehicle is updated
+     * to reflect the new owner.
+     * </p>
+     */
     @Override
     public List<Vehicle> reassignVehicles(String oldUsername, String newUsername) {
         if (oldUsername == null || newUsername == null) {
@@ -42,6 +57,9 @@ public class InMemoryVehicleRepository implements VehicleRepository {
         return new ArrayList<>(existing);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public List<Vehicle> findByUsername(String username) {
         if (username == null) {
@@ -51,6 +69,9 @@ public class InMemoryVehicleRepository implements VehicleRepository {
         return new ArrayList<>(vehiclesByUser.getOrDefault(username.toLowerCase(), Collections.emptyList()));
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public Optional<Vehicle> findByUsernameAndLicense(String username, String licenseNumber) {
         String normalizedLicense = normalizeLicense(licenseNumber);
@@ -64,11 +85,17 @@ public class InMemoryVehicleRepository implements VehicleRepository {
                 .findFirst();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public Optional<Vehicle> findByLicense(String licenseNumber) {
         return findByPlate(licenseNumber);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public Optional<Vehicle> findByPlate(String licenseNumber) {
         String normalizedLicense = normalizeLicense(licenseNumber);
@@ -81,6 +108,13 @@ public class InMemoryVehicleRepository implements VehicleRepository {
                 .findFirst();
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Vehicles are appended to the owner's list without further validation; callers should perform
+     * uniqueness checks before adding.
+     * </p>
+     */
     @Override
     public void addVehicle(Vehicle vehicle) {
         if (vehicle == null || vehicle.getUsername() == null) {
@@ -91,6 +125,9 @@ public class InMemoryVehicleRepository implements VehicleRepository {
         vehiclesByUser.computeIfAbsent(key, k -> Collections.synchronizedList(new ArrayList<>())).add(vehicle);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void removeVehicle(String username, String licenseNumber) {
         String normalizedLicense = normalizeLicense(licenseNumber);
@@ -105,6 +142,9 @@ public class InMemoryVehicleRepository implements VehicleRepository {
         list.removeIf(v -> normalizedLicense.equals(normalizeLicense(v.getLicenseNumber())));
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void removeVehiclesForUser(String username) {
         if (username == null) {
@@ -113,6 +153,12 @@ public class InMemoryVehicleRepository implements VehicleRepository {
         vehiclesByUser.remove(username.toLowerCase());
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Iterates over all user buckets to remove any matching license plate.
+     * </p>
+     */
     @Override
     public boolean removeByLicense(String licenseNumber) {
         String normalizedLicense = normalizeLicense(licenseNumber);
@@ -126,6 +172,12 @@ public class InMemoryVehicleRepository implements VehicleRepository {
         return removed;
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Blacklist status is stored directly on the vehicle record within the in-memory map.
+     * </p>
+     */
     @Override
     public Optional<Vehicle> updateBlacklistStatus(String licenseNumber, boolean blacklisted) {
         Optional<Vehicle> match = findByLicense(licenseNumber);
@@ -133,12 +185,20 @@ public class InMemoryVehicleRepository implements VehicleRepository {
         return match;
     }
 
+    /**
+     * Returns a flat copy of all vehicles held in memory.
+     *
+     * @return list of every vehicle across all users
+     */
     public List<Vehicle> findAll() {
         return vehiclesByUser.values().stream()
                 .flatMap(List::stream)
                 .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public List<VehicleWithOwner> findAllWithOwners(UserRepository userRepository) {
         List<VehicleWithOwner> results = new ArrayList<>();

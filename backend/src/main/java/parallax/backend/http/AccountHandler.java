@@ -17,6 +17,15 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
+/**
+ * HTTP handler for account management operations.
+ * <p>
+ * Supports updating contact details, changing passwords, and deleting accounts via the
+ * {@code /api/account} endpoint. Each operation validates credentials using the supplied
+ * {@link UserRepository} and maintains vehicle ownership through {@link VehicleRepository} when a
+ * username changes or an account is removed. CORS preflight requests are respected.
+ * </p>
+ */
 public class AccountHandler implements HttpHandler {
     private static final Gson gson = new Gson();
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
@@ -26,12 +35,24 @@ public class AccountHandler implements HttpHandler {
     private final VehicleRepository vehicleRepository;
     private final AppConfig appConfig;
 
+    /**
+     * Creates an account handler.
+     *
+     * @param userRepository    repository used for credential validation and user updates
+     * @param vehicleRepository repository used to keep vehicle ownership in sync with account changes
+     * @param appConfig         configuration providing admin safeguards and CORS settings
+     */
     public AccountHandler(UserRepository userRepository, VehicleRepository vehicleRepository, AppConfig appConfig) {
         this.userRepository = userRepository;
         this.vehicleRepository = vehicleRepository;
         this.appConfig = appConfig;
     }
 
+    /**
+     * Routes account-related requests based on path suffix and HTTP method, delegating to specific
+     * handlers for contact updates, password changes, or account deletion. Unsupported methods
+     * return {@code 405 Method Not Allowed}.
+     */
     @Override
     public void handle(HttpExchange exchange) throws IOException {
         addCorsHeaders(exchange);
@@ -58,6 +79,11 @@ public class AccountHandler implements HttpHandler {
         exchange.sendResponseHeaders(405, -1);
     }
 
+    /**
+     * Updates a user's contact information after validating current credentials and ensuring email
+     * and phone uniqueness. When the username/email changes, associated vehicles are reassigned to
+     * the new owner key.
+     */
     private void handleContact(HttpExchange exchange) throws IOException {
         ContactUpdateRequest request;
         try (InputStreamReader reader = new InputStreamReader(exchange.getRequestBody(), StandardCharsets.UTF_8)) {
@@ -129,6 +155,10 @@ public class AccountHandler implements HttpHandler {
         sendJson(exchange, 200, Map.of("success", true, "user", sanitized));
     }
 
+    /**
+     * Changes a user's password after validating the current password and enforcing basic
+     * complexity and confirmation rules.
+     */
     private void handlePassword(HttpExchange exchange) throws IOException {
         PasswordUpdateRequest request;
         try (InputStreamReader reader = new InputStreamReader(exchange.getRequestBody(), StandardCharsets.UTF_8)) {
@@ -171,6 +201,10 @@ public class AccountHandler implements HttpHandler {
         sendJson(exchange, 200, Map.of("success", true));
     }
 
+    /**
+     * Deletes a user account and removes all associated vehicles after verifying credentials and
+     * ensuring the admin account is protected.
+     */
     private void handleDelete(HttpExchange exchange) throws IOException {
         DeleteRequest request;
         try (InputStreamReader reader = new InputStreamReader(exchange.getRequestBody(), StandardCharsets.UTF_8)) {

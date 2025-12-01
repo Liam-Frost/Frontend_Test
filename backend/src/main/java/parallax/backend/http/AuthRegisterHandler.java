@@ -17,16 +17,36 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Optional;
 
+/**
+ * HTTP handler for user registration.
+ * <p>
+ * Accepts {@code POST /api/auth/register} with a JSON {@link RegisterRequest} payload. Performs
+ * basic validation, rejects conflicts with the configured admin account, persists a new user
+ * through {@link UserRepository}, and returns a sanitized {@link RegisterResponse}. Handles CORS
+ * preflight requests.
+ * </p>
+ */
 public class AuthRegisterHandler implements HttpHandler {
     private static final Gson gson = new Gson();
     private final UserRepository userRepository;
     private final AppConfig appConfig;
 
+    /**
+     * Constructs a registration handler.
+     *
+     * @param userRepository repository where new users are created
+     * @param appConfig      configuration used for admin safeguards and CORS settings
+     */
     public AuthRegisterHandler(UserRepository userRepository, AppConfig appConfig) {
         this.userRepository = userRepository;
         this.appConfig = appConfig;
     }
 
+    /**
+     * Processes registration requests, ensuring required fields are present, verifying email and
+     * phone uniqueness, and creating a new user record when valid. Responds with appropriate HTTP
+     * status codes for validation errors or conflicts.
+     */
     @Override
     public void handle(HttpExchange exchange) throws IOException {
         addCorsHeaders(exchange);

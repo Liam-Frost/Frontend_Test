@@ -7,10 +7,21 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
+/**
+ * In-memory implementation of {@link UserRepository} for demos and tests.
+ * <p>
+ * User data is held in a concurrent map and therefore reset on every server restart. The class
+ * also seeds a demo account for quick manual testing. This implementation will be replaced by a
+ * SQLite-backed repository when persistence is introduced.
+ * </p>
+ */
 public class InMemoryUserRepository implements UserRepository {
     // TODO: replace in-memory map with real SQLite queries using DataSource
     private final Map<String, User> users = new ConcurrentHashMap<>();
 
+    /**
+     * Creates the repository with a pre-seeded demo user to simplify local testing.
+     */
     public InMemoryUserRepository() {
         // TODO: replace in-memory map with real SQLite queries using DataSource
         User demo = new User("demo@parallax.test", "demo@parallax.test", "Demo User", "DemoPass123");
@@ -43,6 +54,12 @@ public class InMemoryUserRepository implements UserRepository {
         return Optional.empty();
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * The lookup is case-insensitive and limited to the in-memory map.
+     * </p>
+     */
     @Override
     public Optional<User> findByEmail(String email) {
         if (email == null) {
@@ -52,6 +69,12 @@ public class InMemoryUserRepository implements UserRepository {
         return Optional.ofNullable(users.get(email.toLowerCase()));
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Phone signatures are normalized by stripping non-digits before comparison.
+     * </p>
+     */
     @Override
     public Optional<User> findByPhone(String phoneCountry, String phoneDigits) {
         if (phoneCountry == null || phoneDigits == null) {
@@ -65,6 +88,13 @@ public class InMemoryUserRepository implements UserRepository {
                 .findFirst();
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * This implementation performs an insert-or-replace into the in-memory map using a
+     * lowercased username as the key.
+     * </p>
+     */
     @Override
     public User createUser(User user) {
         if (user == null || user.getUsername() == null) {
@@ -76,6 +106,13 @@ public class InMemoryUserRepository implements UserRepository {
         return user;
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Updating contact details may change the map key; when the username changes the associated
+     * entry is reinserted under the new normalized email.
+     * </p>
+     */
     @Override
     public Optional<User> updateContact(String username, String newEmail, String phoneCountry, String phone) {
         if (username == null || newEmail == null) {
@@ -102,6 +139,12 @@ public class InMemoryUserRepository implements UserRepository {
         return Optional.of(existing);
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Passwords are stored as provided; no hashing is performed in the in-memory demo.
+     * </p>
+     */
     @Override
     public Optional<User> updatePassword(String username, String newPassword) {
         if (username == null || newPassword == null) {
@@ -115,6 +158,12 @@ public class InMemoryUserRepository implements UserRepository {
         return Optional.of(existing);
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Deletion removes the entry from the in-memory map and therefore cannot be recovered.
+     * </p>
+     */
     @Override
     public boolean deleteUser(String username) {
         if (username == null) {
@@ -123,6 +172,9 @@ public class InMemoryUserRepository implements UserRepository {
         return users.remove(username.toLowerCase()) != null;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public Map<String, User> findAllUsers() {
         // Helper primarily for testing/debugging

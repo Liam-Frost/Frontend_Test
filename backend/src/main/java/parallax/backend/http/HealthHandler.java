@@ -10,6 +10,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Simple liveness endpoint for uptime checks and load balancer health probes.
+ * Responds with {@code 200 OK} and a JSON payload when reachable.
+ */
 public class HealthHandler implements HttpHandler {
     private static final Gson gson = new Gson();
 

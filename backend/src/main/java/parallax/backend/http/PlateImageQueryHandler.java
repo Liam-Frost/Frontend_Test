@@ -24,16 +24,38 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * HTTP handler that accepts an uploaded plate image, forwards it to the external Python recognition
+ * service, and reports whether the recognized plate exists or is blacklisted in the system.
+ * <p>
+ * Expects {@code POST /api/vehicles/query-image} with a {@code multipart/form-data} body containing
+ * a file field named {@code image}. The Python service is expected to return JSON with fields such
+ * as {@code success}, {@code plateFound}, and {@code licenseNumber}. The handler responds with JSON
+ * describing whether a plate was detected and the blacklist status if present in
+ * {@link VehicleRepository}.
+ * </p>
+ */
 public class PlateImageQueryHandler implements HttpHandler {
     private static final Gson gson = new Gson();
     private final VehicleRepository vehicleRepository;
     private final AppConfig appConfig;
 
+    /**
+     * Creates the handler with the required repositories and configuration.
+     *
+     * @param vehicleRepository repository used to resolve blacklist status for detected plates
+     * @param appConfig         configuration providing the external recognition service URL and CORS settings
+     */
     public PlateImageQueryHandler(VehicleRepository vehicleRepository, AppConfig appConfig) {
         this.vehicleRepository = vehicleRepository;
         this.appConfig = appConfig;
     }
 
+    /**
+     * Processes multipart image upload requests, sends the image to the Python detection service,
+     * and returns a JSON object indicating detection success and blacklist status. Rejects
+     * unsupported methods or malformed multipart payloads with appropriate status codes.
+     */
     @Override
     public void handle(HttpExchange exchange) throws IOException {
         addCorsHeaders(exchange);
@@ -112,7 +134,16 @@ public class PlateImageQueryHandler implements HttpHandler {
         }
     }
 
-    private JsonObject callPythonService(Path imagePath) throws IOException, InterruptedException {
+    /**
+     * Calls the configured Python service with a multipart request containing the temporary image
+     * file. The service is expected to respond with JSON indicating detection results.
+     *
+     * @param imagePath path to the temporary file to send
+     * @return parsed JSON response, or {@code null} if the call fails
+     * @throws IOException          if the request cannot be built or read
+     * @throws InterruptedException if the HTTP client is interrupted while waiting for a response
+     */
+    protected JsonObject callPythonService(Path imagePath) throws IOException, InterruptedException {
         String boundary = "----Parallax" + UUID.randomUUID();
         ByteArrayOutputStream body = new ByteArrayOutputStream();
         StringBuilder sb = new StringBuilder();

@@ -16,16 +16,36 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
+/**
+ * HTTP handler for user authentication.
+ * <p>
+ * Accepts {@code POST /api/auth/login} with a JSON {@link LoginRequest} body containing an email or
+ * phone identifier and plaintext password. Successful authentication returns a {@link
+ * LoginResponse} detailing the username, display name, and admin status. CORS preflight requests
+ * are also handled.
+ * </p>
+ */
 public class AuthLoginHandler implements HttpHandler {
     private static final Gson gson = new Gson();
     private final UserRepository userRepository;
     private final AppConfig appConfig;
 
+    /**
+     * Creates a login handler backed by the provided repository and configuration.
+     *
+     * @param userRepository repository used to validate credentials
+     * @param appConfig      configuration supplying admin credentials and CORS settings
+     */
     public AuthLoginHandler(UserRepository userRepository, AppConfig appConfig) {
         this.userRepository = userRepository;
         this.appConfig = appConfig;
     }
 
+    /**
+     * Processes login requests by validating the HTTP method, parsing the JSON body, checking
+     * administrator credentials when enabled, and delegating user lookup to the repository.
+     * Returns 401 on invalid credentials and 200 with {@link LoginResponse} on success.
+     */
     @Override
     public void handle(HttpExchange exchange) throws IOException {
 
