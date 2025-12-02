@@ -103,7 +103,8 @@ public class PlateImageQueryHandler implements HttpHandler {
                 return;
             }
 
-            boolean plateFound = detectionResponse.has("plateFound") && detectionResponse.get("plateFound").getAsBoolean();
+            boolean plateFound = detectionResponse.has("plateFound")
+                    && detectionResponse.get("plateFound").getAsBoolean();
             if (!plateFound) {
                 sendJson(exchange, 200, Map.of(
                         "success", true,
@@ -112,27 +113,35 @@ public class PlateImageQueryHandler implements HttpHandler {
                 ));
                 return;
             }
-
-            String plate = detectionResponse.has("licenseNumber") ? detectionResponse.get("licenseNumber").getAsString() : null;
+            
+            String plate = detectionResponse.has("licenseNumber")
+                    ? detectionResponse.get("licenseNumber").getAsString()
+                    : null;
             String normalizedPlate = normalizeLicense(plate);
             Optional<Vehicle> match = vehicleRepository.findByPlate(normalizedPlate);
-
+            
             boolean foundInSystem = match.isPresent();
             boolean blacklisted = match.map(Vehicle::isBlacklisted).orElse(false);
-
-            sendJson(exchange, 200, Map.of(
-                    "success", true,
-                    "plateFound", true,
-                    "licenseNumber", normalizedPlate,
-                    "foundInSystem", foundInSystem,
-                    "blacklisted", blacklisted
-            ));
+            
+            JsonObject responseBody = new JsonObject();
+            responseBody.addProperty("success", true);
+            responseBody.addProperty("plateFound", true);
+            responseBody.addProperty("licenseNumber", normalizedPlate);
+            responseBody.addProperty("foundInSystem", foundInSystem);
+            responseBody.addProperty("blacklisted", blacklisted);
+            
+            if (detectionResponse.has("confidence")) {
+                responseBody.add("confidence", detectionResponse.get("confidence"));
+            }
+            
+            sendJson(exchange, 200, responseBody);
         } catch (Exception e) {
             sendJson(exchange, 500, Map.of("success", false, "message", "Image recognition failed."));
         } finally {
             Files.deleteIfExists(tempFile);
         }
     }
+    
 
     /**
      * Calls the configured Python service with a multipart request containing the temporary image
@@ -238,6 +247,21 @@ public class PlateImageQueryHandler implements HttpHandler {
         h.add("Access-Control-Allow-Methods", "POST, OPTIONS");
     }
 
+    /**
+     * Serializes the given response body as JSON and writes it to the HTTP response.
+     * <p>
+     * This method uses the shared {@link Gson} instance to convert the provided
+     * {@code body} object (for example a {@link Map} or {@link JsonObject}) into a
+     * UTF-8 encoded JSON payload. It also sets the {@code Content-Type} header to
+     * {@code application/json}, sends the provided HTTP status code, and then
+     * writes the serialized bytes to the exchange's response stream.
+     * </p>
+     *
+     * @param exchange   the HTTP exchange to write the response to
+     * @param statusCode the HTTP status code to send (e.g. 200, 400, 500)
+     * @param body       the response object to serialize as JSON
+     * @throws IOException if an I/O error occurs while sending the response
+     */
     private void sendJson(HttpExchange exchange, int statusCode, Object body) throws IOException {
         byte[] bytes = gson.toJson(body).getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().add("Content-Type", "application/json");
