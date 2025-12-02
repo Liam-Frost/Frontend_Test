@@ -1542,11 +1542,17 @@ async function handleQueryImageSubmit(event) {
 
     const plate = (data.licenseNumber || "").toUpperCase();
     const plateTag = `<span class="plate-code">${plate}</span>`;
+    
+    let confidenceText = "";
+    if (typeof data.confidence === "number") {
+      const pct = (data.confidence * 100).toFixed(1); // 0.9321 -> 93.2
+      confidenceText = ` (confidence ${pct}%)`;
+    }
 
     if (!data.foundInSystem) {
       showMessage(
         queryImageResult,
-        `Detected plate: ${plateTag} This plate is not registered in Parallax.`,
+        `Detected plate: ${plateTag}${confidenceText} This plate is not registered in Parallax.`,
         "error"
       );
       return;
@@ -1555,7 +1561,7 @@ async function handleQueryImageSubmit(event) {
     if (data.blacklisted) {
       showMessage(
         queryImageResult,
-        `Detected plate: ${plateTag} This plate is registered and currently blacklisted.`,
+        `Detected plate: ${plateTag}${confidenceText} This plate is registered and currently blacklisted.`,
         "error"
       );
       return;
@@ -1563,7 +1569,7 @@ async function handleQueryImageSubmit(event) {
 
     showMessage(
       queryImageResult,
-      `Detected plate: ${plateTag} This plate is registered and not blacklisted.`,
+      `Detected plate: ${plateTag}${confidenceText} This plate is registered and not blacklisted.`,
       "success"
     );
   } catch (error) {
